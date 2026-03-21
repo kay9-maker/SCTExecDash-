@@ -1,0 +1,3989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supply Chain Technology Dashboard</title>
+
+    <!-- External Libraries from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f3f4f6;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+
+        /* JPMC-inspired header: navy to Chase blue */
+        .header {
+            background: linear-gradient(135deg, #003057 0%, #004B87 45%, #117ACA 100%);
+            color: white;
+            padding: 0.4rem 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .header-left h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .header-left .header-org {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.92;
+            margin-bottom: 0.2rem;
+        }
+
+        .header-left p {
+            font-size: 0.7rem;
+            opacity: 0.9;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #004B87;
+        }
+
+        .btn-primary:hover {
+            background: #f3f4f6;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Main container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Progress bar */
+        .progress-bar-container {
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .progress-bar-container:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .progress-bar-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 1rem;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            transition: width 0.3s ease;
+        }
+
+        /* Metric cards grid - single row, auto-fit */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-top: 4px solid;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+
+        .metric-card:active {
+            transform: translateY(-2px);
+        }
+
+        .metric-card.active {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .metric-card.done { border-top-color: #10b981; }
+        .metric-card.in-progress { border-top-color: #3b82f6; }
+        .metric-card.in-review { border-top-color: #f59e0b; }
+        .metric-card.todo { border-top-color: #6b7280; }
+        .metric-card.blocked { border-top-color: #ef4444; }
+
+        .metric-card.active.done {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+            border-top-width: 6px;
+        }
+        .metric-card.active.in-progress {
+            background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+            border-top-width: 6px;
+        }
+        .metric-card.active.in-review {
+            background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+            border-top-width: 6px;
+        }
+        .metric-card.active.todo {
+            background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+            border-top-width: 6px;
+        }
+        .metric-card.active.blocked {
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+            border-top-width: 6px;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            position: relative;
+            z-index: 1;
+            transition: color 0.3s ease;
+        }
+
+        .metric-card:hover .metric-value {
+            color: #117ACA;
+        }
+
+        .metric-subtext {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Charts grid - 2 columns per row, 2nd column wider */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Milestone Tracker Section */
+        .milestone-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #117ACA;
+        }
+
+        .milestone-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .milestone-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .milestone-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .milestone-table th {
+            background: #f9fafb;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .milestone-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+
+        .milestone-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .milestone-id {
+            font-weight: 600;
+            color: #117ACA;
+        }
+
+        .period-text {
+            font-size: 0.875rem;
+        }
+
+        .period-strikethrough {
+            text-decoration: line-through;
+            color: #9ca3af;
+            display: block;
+            font-size: 0.8rem;
+        }
+
+        .progress-bar-container-milestone {
+            width: 100%;
+            background: #e5e7eb;
+            border-radius: 0.25rem;
+            height: 1.25rem;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+
+        .progress-bar-fill-milestone {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar-fill-milestone.high {
+            background: #10b981;
+        }
+
+        .progress-bar-fill-milestone.medium {
+            background: #f59e0b;
+        }
+
+        .progress-bar-fill-milestone.low {
+            background: #ef4444;
+        }
+
+        .schedule-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .schedule-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .schedule-on-track {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .schedule-late {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .priority-1 {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .priority-2 {
+            background: #fed7aa;
+            color: #92400e;
+        }
+
+        .priority-3 {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        /* Milestone Accordion */
+        .milestone-accordion {
+            margin-bottom: 1rem;
+        }
+
+        .milestone-accordion-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .milestone-accordion-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .milestone-accordion-header {
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #117ACA 0%, #4DA3E0 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .milestone-accordion-header:hover {
+            background: linear-gradient(135deg, #004B87 0%, #117ACA 100%);
+        }
+
+        .milestone-accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .milestone-accordion-id {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .milestone-accordion-theme {
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+
+        .milestone-accordion-meta {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            font-size: 0.875rem;
+        }
+
+        .milestone-accordion-progress {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+        }
+
+        .milestone-accordion-arrow {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .milestone-accordion-item.active .milestone-accordion-arrow {
+            transform: rotate(180deg);
+        }
+
+        .milestone-accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .milestone-accordion-item.active .milestone-accordion-content {
+            max-height: 2000px;
+        }
+
+        .milestone-accordion-body {
+            padding: 1.5rem;
+        }
+
+        .milestone-form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .milestone-form-label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .milestone-form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+
+        .milestone-form-input:focus {
+            outline: none;
+            border-color: #117ACA;
+            box-shadow: 0 0 0 3px rgba(17, 122, 202, 0.15);
+        }
+
+        .milestone-form-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            resize: vertical;
+        }
+
+        .milestone-form-textarea:focus {
+            outline: none;
+            border-color: #117ACA;
+            box-shadow: 0 0 0 3px rgba(17, 122, 202, 0.15);
+        }
+
+        .deliverables-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid #e5e7eb;
+        }
+
+        .deliverable-item {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .deliverable-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .deliverable-name {
+            font-weight: 600;
+            color: #1f2937;
+            flex: 1;
+        }
+
+        .deliverable-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .deliverable-status-select {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            background: white;
+        }
+
+        .deliverable-progress {
+            width: 80px;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+
+        .deliverable-remove-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .deliverable-remove-btn:hover {
+            background: #dc2626;
+        }
+
+        .add-deliverable-btn {
+            background: #117ACA;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 500;
+            width: 100%;
+            margin-top: 0.75rem;
+        }
+
+        .add-deliverable-btn:hover {
+            background: #004B87;
+        }
+
+        .milestone-save-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 1.5rem;
+        }
+
+        .milestone-save-btn:hover {
+            background: #059669;
+        }
+
+        .milestone-dates-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .milestone-dates-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Issue tracker */
+        .issue-tracker {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #117ACA;
+            box-shadow: 0 0 0 3px rgba(17, 122, 202, 0.15);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: #f9fafb;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-done {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-in-progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-in-review {
+            background: #fed7aa;
+            color: #92400e;
+        }
+
+        .status-todo {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .status-blocked {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .priority-high {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .priority-medium {
+            color: #f59e0b;
+        }
+
+        .priority-low {
+            color: #6b7280;
+        }
+
+        /* CSV Upload Section */
+        .upload-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-zone:hover {
+            border-color: #117ACA;
+            background: #f9fafb;
+        }
+
+        .upload-zone.dragover {
+            border-color: #117ACA;
+            background: #f3e8ff;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* Narrative section */
+        .narrative-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .narrative-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+
+        .narrative-text {
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #4b5563;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            table {
+                font-size: 0.75rem;
+            }
+
+            th, td {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Hide elements in presentation mode */
+        body.presentation-mode .upload-section {
+            display: none;
+        }
+
+        body.presentation-mode .edit-controls {
+            display: none;
+        }
+
+        body.presentation-mode .milestone-row {
+            cursor: default !important;
+            pointer-events: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .loading::after {
+            content: "...";
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+
+        /* ===== DARK MODE ===== */
+        body.dark-mode {
+            background: #1a1a1a;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .header {
+            background: linear-gradient(135deg, #001a33 0%, #003057 45%, #004B87 100%);
+        }
+
+        body.dark-mode .progress-bar-container,
+        body.dark-mode .metric-card,
+        body.dark-mode .chart-card,
+        body.dark-mode .narrative-section,
+        body.dark-mode .issue-tracker,
+        body.dark-mode .upload-section,
+        body.dark-mode .executive-summary {
+            background: #2d2d2d;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .metric-label,
+        body.dark-mode .narrative-text,
+        body.dark-mode th {
+            color: #9ca3af;
+        }
+
+        body.dark-mode .metric-value,
+        body.dark-mode .chart-title,
+        body.dark-mode .narrative-title {
+            color: #f3f4f6;
+        }
+
+        body.dark-mode table {
+            color: #e5e7eb;
+        }
+
+        body.dark-mode th {
+            background: #1a1a1a;
+            border-bottom-color: #404040;
+        }
+
+        body.dark-mode td {
+            border-bottom-color: #404040;
+        }
+
+        body.dark-mode tr:hover {
+            background: #3a3a3a;
+        }
+
+        body.dark-mode .search-box {
+            background: #3a3a3a;
+            border-color: #505050;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .progress-bar {
+            background: #404040;
+        }
+
+        body.dark-mode .upload-zone {
+            border-color: #505050;
+        }
+
+        body.dark-mode .upload-zone:hover {
+            background: #3a3a3a;
+        }
+
+        /* ===== ENHANCED PRESENTATION MODE ===== */
+        body.presentation-mode .header {
+            padding: 0.4rem 2rem;
+        }
+
+        body.presentation-mode .header h1 {
+            font-size: 1.25rem;
+        }
+
+        body.presentation-mode .header-left p {
+            font-size: 0.7rem;
+        }
+
+        body.presentation-mode .metric-value {
+            font-size: 2.5rem;
+        }
+
+        body.presentation-mode .metric-label {
+            font-size: 1rem;
+        }
+
+        body.presentation-mode .chart-title {
+            font-size: 1.5rem;
+        }
+
+        body.presentation-mode .narrative-title {
+            font-size: 1.5rem;
+        }
+
+        body.presentation-mode .narrative-text {
+            font-size: 1.25rem;
+        }
+
+        body.presentation-mode table {
+            font-size: 1rem;
+        }
+
+        body.presentation-mode .container {
+            padding: 1.5rem;
+        }
+
+        /* ===== EXECUTIVE SUMMARY ===== */
+        .executive-summary {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            border-left: 6px solid #117ACA;
+        }
+
+        .executive-summary h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .executive-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .executive-summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .summary-column {
+            background: #f9fafb;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border-top: 4px solid;
+        }
+
+        .progress-column {
+            border-top-color: #117ACA;
+            background: linear-gradient(to bottom, #faf5ff 0%, #f9fafb 100%);
+        }
+
+        .wins-column {
+            border-top-color: #10b981;
+            background: linear-gradient(to bottom, #f0fdf4 0%, #f9fafb 100%);
+        }
+
+        .blockers-column {
+            border-top-color: #f59e0b;
+            background: linear-gradient(to bottom, #fffbeb 0%, #f9fafb 100%);
+        }
+
+        .summary-column h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #1f2937;
+        }
+
+        .summary-item {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 0.375rem;
+            border-left: 3px solid #e5e7eb;
+        }
+
+        .summary-item-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+
+        .summary-item-text {
+            font-size: 0.8125rem;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .milestone-progress-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 0.375rem;
+        }
+
+        .milestone-progress-item .milestone-id {
+            font-weight: 700;
+            font-size: 0.875rem;
+            min-width: 2rem;
+        }
+
+        .milestone-progress-mini {
+            flex: 1;
+            height: 1.5rem;
+            background: #e5e7eb;
+            border-radius: 0.25rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .milestone-progress-mini-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .milestone-progress-mini-fill.high {
+            background: #10b981;
+        }
+
+        .milestone-progress-mini-fill.medium {
+            background: #3b82f6;
+        }
+
+        .milestone-progress-mini-fill.low {
+            background: #f59e0b;
+        }
+
+        .win-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid #10b981;
+        }
+
+        .win-icon {
+            font-size: 1rem;
+            margin-top: 0.125rem;
+        }
+
+        .win-content {
+            flex: 1;
+        }
+
+        .win-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.125rem;
+        }
+
+        .win-subtitle {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .blocker-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid #ef4444;
+        }
+
+        .blocker-icon {
+            font-size: 1rem;
+            margin-top: 0.125rem;
+        }
+
+        .blocker-content {
+            flex: 1;
+        }
+
+        .blocker-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.125rem;
+        }
+
+        .blocker-subtitle {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .summary-footer {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.875rem;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        .no-items-message {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #9ca3af;
+            font-size: 0.875rem;
+        }
+
+        /* ===== SECTION NAVIGATION ===== */
+        .section-nav {
+            background: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        body.dark-mode .section-nav {
+            background: #2d2d2d;
+        }
+
+        .section-nav-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .section-nav-btn {
+            padding: 0.5rem 1rem;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .section-nav-btn:hover {
+            background: #117ACA;
+            color: white;
+        }
+
+        body.dark-mode .section-nav-btn {
+            background: #3a3a3a;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .section-nav-btn:hover {
+            background: #117ACA;
+            color: white;
+        }
+
+        body.presentation-mode .section-nav {
+            display: none;
+        }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
+            .header-right,
+            .upload-section,
+            .section-nav,
+            .search-box,
+            .btn {
+                display: none !important;
+            }
+
+            .header {
+                position: static;
+                background: linear-gradient(135deg, #003057 0%, #117ACA 50%, #4DA3E0 100%);
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                page-break-after: avoid;
+            }
+
+            .container {
+                max-width: 100%;
+                padding: 1rem;
+            }
+
+            .progress-bar-container,
+            .executive-summary {
+                page-break-inside: avoid;
+                page-break-after: auto;
+                margin-bottom: 1.5rem;
+            }
+
+            .metrics-grid {
+                page-break-inside: avoid;
+                page-break-after: auto;
+                margin-bottom: 1.5rem;
+            }
+
+            .charts-grid {
+                page-break-before: always;
+            }
+
+            .chart-card {
+                page-break-inside: avoid;
+                page-break-after: always;
+                margin-bottom: 2rem;
+            }
+
+            .narrative-section {
+                page-break-before: always;
+                page-break-inside: avoid;
+            }
+
+            .issue-tracker {
+                page-break-before: always;
+                font-size: 0.75rem;
+            }
+
+            .issue-tracker table {
+                font-size: 0.7rem;
+            }
+
+            .status-badge,
+            .metric-card,
+            .chart-card,
+            .narrative-section,
+            .issue-tracker {
+                box-shadow: none;
+                border: 1px solid #e5e7eb;
+            }
+
+            /* Ensure colors print correctly */
+            .metric-card.done { border-top-color: #10b981 !important; }
+            .metric-card.in-progress { border-top-color: #3b82f6 !important; }
+            .metric-card.in-review { border-top-color: #f59e0b !important; }
+            .metric-card.todo { border-top-color: #6b7280 !important; }
+            .metric-card.blocked { border-top-color: #ef4444 !important; }
+
+            .progress-bar-fill {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .status-done,
+            .status-in-progress,
+            .status-in-review,
+            .status-todo,
+            .status-blocked {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        /* ===== SMOOTH SCROLLING ===== */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* ===== FILTER BADGE ===== */
+        .active-filter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #117ACA;
+            color: white;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .clear-filter-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .clear-filter-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* ===== DEMO DATA WARNING BANNER ===== */
+        .demo-warning {
+            background: linear-gradient(135deg, #FF6B00 0%, #FFA500 100%);
+            color: white;
+            padding: 1rem 2rem;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            box-shadow: 0 4px 8px rgba(255, 107, 0, 0.3);
+            animation: slideDown 0.3s ease;
+        }
+
+        .demo-warning.active {
+            display: flex;
+        }
+
+        .demo-warning-icon {
+            font-size: 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .demo-warning-text {
+            font-size: 1rem;
+            flex: 1;
+            max-width: 800px;
+        }
+
+        .demo-warning-dismiss {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .demo-warning-dismiss:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        body.presentation-mode .demo-warning {
+            display: none !important;
+        }
+
+        @media print {
+            .demo-warning {
+                display: none !important;
+            }
+        }
+
+        /* ===== MODAL STYLES ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+            animation: fadeIn 0.2s;
+        }
+
+        .modal-overlay.active {
+            display: block;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0.5rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #1f2937;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .modal-tab:hover {
+            color: #117ACA;
+        }
+
+        .modal-tab.active {
+            color: #117ACA;
+            border-bottom-color: #117ACA;
+        }
+
+        .modal-tab-content {
+            display: none;
+        }
+
+        .modal-tab-content.active {
+            display: block;
+        }
+
+        .modal-textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            resize: vertical;
+        }
+
+        .modal-textarea:focus {
+            outline: none;
+            border-color: #117ACA;
+            box-shadow: 0 0 0 3px rgba(17, 122, 202, 0.15);
+        }
+
+        .modal-instructions {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.375rem;
+        }
+
+        .modal-instructions h4 {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1e40af;
+        }
+
+        .modal-instructions ol {
+            margin-left: 1.5rem;
+            color: #1f2937;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .modal-preview {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .modal-preview h4 {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #1f2937;
+        }
+
+        .modal-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-top: 1rem;
+        }
+
+        .modal-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-top: 1rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -45%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1>Supply Chain Technology Dashboard</h1>
+                <p class="header-org">JPMorgan Chase</p>
+                <p id="lastUpdated">Last updated: Loading...</p>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary" id="darkModeBtn">Dark Mode</button>
+                <button class="btn btn-secondary" id="presentationModeBtn">Presentation Mode</button>
+                <button class="btn btn-primary" id="refreshBtn">Refresh Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Demo Data Warning Banner -->
+    <div class="demo-warning" id="demoWarning">
+        <span class="demo-warning-icon">⚠️</span>
+        <span class="demo-warning-text">DEMO DATA - You are viewing sample data. Upload your CSV to see real metrics.</span>
+        <button class="demo-warning-dismiss" id="dismissDemoWarning">Dismiss</button>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay"></div>
+
+    <!-- Milestone Data Update Modal -->
+    <div class="modal" id="milestoneModal">
+        <div class="modal-header">
+            <h3 class="modal-title">Update Milestone Data</h3>
+            <button class="modal-close" id="modalCloseBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="milestones">Milestone Overview</button>
+                <button class="modal-tab" data-tab="risks">Risks & Blockers</button>
+            </div>
+
+            <!-- Milestone Tab Content -->
+            <div class="modal-tab-content active" id="milestones-tab">
+                <div class="modal-instructions">
+                    <h4>How to Update Milestone Data:</h4>
+                    <ol>
+                        <li>Export your Confluence page to Word</li>
+                        <li>Open the Word document and select the entire Milestone Overview table</li>
+                        <li>Copy the table (Ctrl+C or Cmd+C)</li>
+                        <li>Paste it in the textarea below</li>
+                        <li>Click "Preview" to verify the data looks correct</li>
+                        <li>Click "Apply Changes" to update the dashboard</li>
+                    </ol>
+                </div>
+                <textarea class="modal-textarea" id="milestoneTextarea" placeholder="Paste your Milestone Overview table here...
+
+Expected format (tab-separated):
+Milestone	Period	Theme	Progress Update	Schedule Status
+M1	Sep 26 - Oct 31	Theme description	100%	Completed"></textarea>
+                <div id="milestonePreview"></div>
+            </div>
+
+            <!-- Risks Tab Content -->
+            <div class="modal-tab-content" id="risks-tab">
+                <div class="modal-instructions">
+                    <h4>How to Update Risks Data:</h4>
+                    <ol>
+                        <li>Export your Confluence page to Word</li>
+                        <li>Open the Word document and select the entire Risks & Blockers table</li>
+                        <li>Copy the table (Ctrl+C or Cmd+C)</li>
+                        <li>Paste it in the textarea below</li>
+                        <li>Click "Preview" to verify the data looks correct</li>
+                        <li>Click "Apply Changes" to update the dashboard</li>
+                    </ol>
+                </div>
+                <textarea class="modal-textarea" id="risksTextarea" placeholder="Paste your Risks & Blockers table here...
+
+Expected format (tab-separated):
+Open/Monitor	Risk/Issue/Block	Details	Priority	Owner	Status/Impact/Decision
+Open	Risk	Description	1	Owner Name	Status details"></textarea>
+                <div id="risksPreview"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="modalResetBtn">Reset to Sample Data</button>
+            <button class="btn btn-secondary" id="modalPreviewBtn">Preview</button>
+            <button class="btn btn-primary" id="modalApplyBtn">Apply Changes</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- CSV Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <div class="chart-title">Upload CSV Data</div>
+            <div class="upload-zone" id="uploadZone">
+                <p style="margin-bottom: 0.5rem; font-weight: 500;">Drop your Jira CSV file here or click to browse</p>
+                <p style="font-size: 0.875rem; color: #6b7280;">Supports Jira exports with Issue Key, Summary, Status, Assignee, etc.</p>
+                <input type="file" id="fileInput" class="file-input" accept=".csv">
+            </div>
+        </div>
+
+        <!-- Section Navigation -->
+        <div class="section-nav">
+            <span class="section-nav-label">Jump to:</span>
+            <button class="section-nav-btn" onclick="document.getElementById('metricsSection').scrollIntoView()">Metrics</button>
+            <button class="section-nav-btn" onclick="document.getElementById('chartsSection').scrollIntoView()">Charts</button>
+            <button class="section-nav-btn" onclick="document.getElementById('tableSection').scrollIntoView()">Issues</button>
+            <div id="activeFilterBadge" style="margin-left: auto; display: none;" class="active-filter-badge">
+                <span id="filterText">Filter active</span>
+                <button class="clear-filter-btn" id="clearFilterBtn">Clear</button>
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="executive-summary" id="summarySection" style="display: none;">
+            <h2>Executive Summary</h2>
+            <div class="executive-summary-grid" id="executiveSummaryGrid">
+                <!-- Progress, Wins, and Blockers will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar-container" id="metricsSection">
+            <div class="progress-bar-label">
+                <span id="progressLabel">Sprint Progress</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid" id="metricsGrid">
+            <!-- Metrics will be populated by JavaScript -->
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid" id="chartsSection">
+            <div class="chart-card">
+                <div class="chart-title">Status Distribution</div>
+                <div class="chart-container">
+                    <canvas id="statusDonutChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Epic Breakdown</div>
+                <div class="chart-container">
+                    <canvas id="epicBreakdownChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Total Ticket Status</div>
+                <div class="chart-container">
+                    <canvas id="sprintVelocityChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">Critical Path Stories</div>
+                <div id="criticalPathTable" style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                    <!-- Critical path table will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Milestone Tracker Section -->
+        <div class="milestone-section">
+            <div class="section-header">
+                <h2 class="section-title">Milestone Tracker</h2>
+            </div>
+
+            <!-- Milestone Accordion Forms -->
+            <div class="milestone-card">
+                <div class="chart-title">Milestone Overview</div>
+                <div id="milestoneAccordion">
+                    <!-- Milestone accordion will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Risks & Blockers Table -->
+            <div class="milestone-card">
+                <div class="chart-title">Risks & Blockers</div>
+                <div id="risksTable" style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                    <!-- Risks table will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Issue Tracker -->
+        <div class="issue-tracker" id="tableSection">
+            <div class="chart-title">Issue Tracker</div>
+            <input type="text" id="searchBox" class="search-box" placeholder="Search by key, summary, assignee, epic...">
+            <div style="overflow-x: auto;">
+                <table id="issueTable">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Summary</th>
+                            <th>Status</th>
+                            <th>Assignee</th>
+                            <th>Priority</th>
+                            <th>Epic</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody id="issueTableBody">
+                        <tr><td colspan="7" class="loading">Loading data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== DATA MODELS =====
+        let allTickets = [];
+        let filteredTickets = [];
+        let charts = {};
+        let activeFilter = null; // Track active filter: 'done', 'in-progress', 'in-review', 'todo', 'blocked', or null
+        let isUsingDemoData = false; // Track if we're viewing demo/sample data
+
+        // ===== MILESTONE DATA WITH DELIVERABLES =====
+        // Progress is auto-calculated from deliverable statuses
+        const milestonesData = [
+            {
+                id: 'M1',
+                dueDate: 'October 31, 2025',
+                originalDate: null,
+                theme: 'Enhance CORE DOMO + Elysium Architecture',
+                deliverables: [
+                    { id: 'm1-1', name: '1.1 Enabling Disaster Recovery (DR) for DOMO', status: 'Complete', progress: 100 },
+                    { id: 'm1-2', name: '1.2 Implementing DOMO Prod Parallel for testing', status: 'Complete', progress: 100 },
+                    { id: 'm1-3', name: '1.3 Design Elysium', status: 'Complete', progress: 100 }
+                ]
+            },
+            {
+                id: 'M2',
+                dueDate: '01/30/26',
+                originalDate: 'November 30, 2025',
+                theme: 'Operational Data Store (Elysium) Design + Predictive Monitoring UI Design',
+                deliverables: [
+                    { id: 'm2-1', name: '2.1 Elysium Design', status: 'In Progress', progress: 95 },
+                    { id: 'm2-2', name: '2.2 Predict Critical Batch Design Completion/Approval', status: 'Complete', progress: 100 }
+                ]
+            },
+            {
+                id: 'M3',
+                dueDate: '02/28/26',
+                originalDate: 'December 31, 2025',
+                theme: 'Elysium Development Complete',
+                deliverables: [
+                    { id: 'm3-1', name: '3.1 Implement Elysium DEV', status: 'In Progress', progress: 55 },
+                    { id: 'm3-2', name: '3.2 Predict Critical Batch Completion', status: 'Complete', progress: 100 }
+                ]
+            },
+            {
+                id: 'M4',
+                dueDate: '03/31/2026',
+                originalDate: 'January 16, 2026',
+                theme: 'Elysium + Predictive Monitoring Production Deployed',
+                deliverables: [
+                    { id: 'm4-1', name: '4.1 Implement Elysium PROD', status: 'Not Started', progress: 0 },
+                    { id: 'm4-2', name: '4.2 Databricks AI BI Pilot', status: 'In Progress', progress: 25 },
+                    { id: 'm4-3', name: '4.3 Domo Dashboard Usage Statistics POC', status: 'Not Started', progress: 0 },
+                    { id: 'm4-4', name: '4.4 Astronomer Impact Analysis', status: 'In Progress', progress: 25 }
+                ]
+            }
+        ];
+
+        // ===== RISKS & BLOCKERS DATA =====
+        // TO UPDATE: Edit this data structure with your Confluence risks information
+        const risksData = [
+            {
+                id: 'risk-1',
+                status: 'Open',
+                type: 'Risk',
+                details: 'DOMO Vulnerabilities',
+                priority: 1,
+                owner: 'CONATOS',
+                statusImpact: 'DOMO Vulnerabilities identified 3/10, fixes deployed in EKS cluster. Access to vulnerability report requested to validate the fix'
+            },
+            {
+                id: 'risk-2',
+                status: 'Open',
+                type: 'Risk',
+                details: 'TAG creation/mapping - Will be a blocker to Databricks-Elysium connection - must be',
+                priority: 2,
+                owner: 'CONKKA',
+                statusImpact: '3/17 - TAGs promoted to Databricks, AD group mapping required - request via access central\n\n3/16 - Bala - INYBSVP assigned to SNOW request, INYBSVP will work'
+            }
+        ];
+
+        // ===== LOCAL STORAGE PERSISTENCE =====
+        function loadMilestoneDataFromStorage() {
+            const stored = localStorage.getItem('milestoneData');
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch (e) {
+                    console.error('Error parsing stored milestone data:', e);
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        function loadRisksDataFromStorage() {
+            const stored = localStorage.getItem('risksData');
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch (e) {
+                    console.error('Error parsing stored risks data:', e);
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        function saveMilestoneDataToStorage(data) {
+            localStorage.setItem('milestoneData', JSON.stringify(data));
+        }
+
+        function saveRisksDataToStorage(data) {
+            localStorage.setItem('risksData', JSON.stringify(data));
+        }
+
+        // Load data from storage on page load
+        const storedMilestones = loadMilestoneDataFromStorage();
+        const storedRisks = loadRisksDataFromStorage();
+
+        // Override defaults if stored data exists
+        if (storedMilestones) {
+            milestonesData.length = 0;
+            milestonesData.push(...storedMilestones);
+        }
+        if (storedRisks) {
+            risksData.length = 0;
+            risksData.push(...storedRisks);
+        }
+
+        // ===== TABLE DATA PARSER =====
+        function parseTSVData(text) {
+            // Remove empty lines and trim
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+            if (lines.length === 0) {
+                throw new Error('No data found');
+            }
+
+            // Parse lines into rows (tab-separated)
+            const rows = lines.map(line => {
+                // Split by tab, but preserve content within cells
+                return line.split('\t').map(cell => cell.trim());
+            });
+
+            return rows;
+        }
+
+        function parseMilestoneData(text) {
+            try {
+                const rows = parseTSVData(text);
+
+                // Skip header row (first row)
+                const dataRows = rows.slice(1);
+
+                if (dataRows.length === 0) {
+                    throw new Error('No milestone data rows found (only header)');
+                }
+
+                const milestones = dataRows.map((row, index) => {
+                    if (row.length < 5) {
+                        throw new Error(`Row ${index + 2} has ${row.length} columns, expected 5`);
+                    }
+
+                    const [id, period, theme, progressStr, scheduleStatus] = row;
+
+                    // Parse progress percentage
+                    const progressMatch = progressStr.match(/(\d+)%/);
+                    const progress = progressMatch ? parseInt(progressMatch[1]) : 0;
+
+                    // Check if period has original and target dates
+                    // Format: "Nov 1-Nov 30" or "Nov 1-Nov 30\nTarget: 01/30/26"
+                    let periodObj = {
+                        original: period,
+                        target: period,
+                        changed: false
+                    };
+
+                    // Look for multiple lines in period cell
+                    const periodLines = period.split(/\n|\\n/).map(l => l.trim());
+                    if (periodLines.length > 1) {
+                        periodObj.original = periodLines[0];
+                        periodObj.target = periodLines[periodLines.length - 1].replace(/^Target:\s*/i, '');
+                        periodObj.changed = true;
+                    }
+
+                    return {
+                        id: id,
+                        period: periodObj,
+                        theme: theme,
+                        progress: progress,
+                        scheduleStatus: scheduleStatus
+                    };
+                });
+
+                return milestones;
+            } catch (error) {
+                throw new Error(`Failed to parse milestone data: ${error.message}`);
+            }
+        }
+
+        function parseRisksData(text) {
+            try {
+                const rows = parseTSVData(text);
+
+                // Skip header row
+                const dataRows = rows.slice(1);
+
+                if (dataRows.length === 0) {
+                    throw new Error('No risks data rows found (only header)');
+                }
+
+                const risks = dataRows.map((row, index) => {
+                    if (row.length < 6) {
+                        throw new Error(`Row ${index + 2} has ${row.length} columns, expected 6`);
+                    }
+
+                    const [status, type, details, priorityStr, owner, statusImpact] = row;
+
+                    // Parse priority number
+                    const priorityMatch = priorityStr.match(/(\d+)/);
+                    const priority = priorityMatch ? parseInt(priorityMatch[1]) : 2;
+
+                    return {
+                        status: status,
+                        type: type,
+                        details: details,
+                        priority: priority,
+                        owner: owner,
+                        statusImpact: statusImpact
+                    };
+                });
+
+                return risks;
+            } catch (error) {
+                throw new Error(`Failed to parse risks data: ${error.message}`);
+            }
+        }
+
+        // ===== DEPRECATED MODAL FUNCTIONS REMOVED =====
+        // Modal interface replaced with inline accordion forms
+
+        // ===== DEMO DATA WARNING =====
+        function showDemoWarning() {
+            const banner = document.getElementById('demoWarning');
+            if (banner) {
+                banner.classList.add('active');
+            }
+        }
+
+        function hideDemoWarning() {
+            const banner = document.getElementById('demoWarning');
+            if (banner) {
+                banner.classList.remove('active');
+            }
+        }
+
+        function isDemoData(tickets, fileName) {
+            // Check if this is demo data by:
+            // 1. Filename is latest.csv
+            // 2. Contains demo ticket keys (GER-xxx)
+            // 3. Contains demo assignee names
+            if (fileName === 'latest.csv') return true;
+
+            const demoKeys = ['GER-', 'DEMO-', 'SAMPLE-'];
+            const demoAssignees = ['Sarah Chen', 'Marcus Rodriguez', 'Emily Watson',
+                                  'James Kim', 'Priya Patel', 'Alex Thompson', 'Lisa Anderson'];
+
+            const hasDemoKeys = tickets.some(t =>
+                demoKeys.some(prefix => t.issueKey.startsWith(prefix))
+            );
+
+            const hasDemoAssignees = tickets.some(t =>
+                demoAssignees.includes(t.assignee)
+            );
+
+            return hasDemoKeys || hasDemoAssignees;
+        }
+
+        // ===== STATUS NORMALIZATION =====
+        const statusMap = {
+            'done': 'Done',
+            'closed': 'Done',
+            'resolved': 'Done',
+            'complete': 'Done',
+            'completed': 'Done',
+            'finished': 'Done',
+            'in progress': 'In Progress',
+            'in development': 'In Progress',
+            'dev': 'In Progress',
+            'development': 'In Progress',
+            'in review': 'In Review',
+            'in testing': 'In Review',
+            'qa': 'In Review',
+            'testing': 'In Review',
+            'code review': 'In Review',
+            'review': 'In Review',
+            'to do': 'To Do',
+            'todo': 'To Do',
+            'backlog': 'To Do',
+            'open': 'To Do',
+            'new': 'To Do',
+            'ready': 'To Do',
+            'blocked': 'Blocked',
+            'on hold': 'Blocked',
+            'waiting': 'Blocked',
+            'paused': 'Blocked',
+            'impediment': 'Blocked'
+        };
+
+        function normalizeStatus(status) {
+            const key = status.toLowerCase().trim();
+            return statusMap[key] || 'To Do';
+        }
+
+        // ===== CSV PARSING =====
+        function parseCSV(csvText, fileName = 'latest.csv') {
+            return new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        const tickets = results.data.map(row => {
+                            // Flexible header mapping
+                            const issueKey = row['Issue key'] || row['Issue Key'] || row['Key'] || row['Issue ID'] || '';
+                            const summary = row['Summary'] || row['Title'] || row['Description'] || '';
+                            const status = row['Status'] || row['State'] || '';
+                            const assignee = row['Assignee'] || row['Assigned To'] || '';
+                            const priority = row['Priority'] || '';
+                            const parentKey = row['Parent key'] || row['Parent Key'] || '';
+                            const parentSummary = row['Parent summary'] || row['Parent Summary'] || '';
+                            const epic = parentSummary || row['Labels_1'] || row['Epic'] || row['Epic Name'] || row['Epic Link'] || '';
+                            const labels = row['Labels'] || '';
+                            const sprint = row['Sprint'] || '';
+                            const created = row['Created'] || row['Create Date'] || '';
+                            const updated = row['Updated'] || row['Last Updated'] || '';
+                            const dueDate = row['Custom field (Target end)'] || row['Custom Field (Target end)'] || row['Due Date'] || row['Due'] || '';
+                            const storyPoints = parseInt(row['Story Points'] || row['Points'] || '0', 10);
+
+                            return {
+                                issueKey,
+                                summary,
+                                status: normalizeStatus(status),
+                                rawStatus: status,
+                                assignee,
+                                priority,
+                                parentKey,
+                                parentSummary,
+                                epic,
+                                labels,
+                                sprint,
+                                created,
+                                updated,
+                                dueDate,
+                                storyPoints
+                            };
+                        });
+
+                        resolve(tickets);
+                    },
+                    error: (error) => {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        // ===== METRICS CALCULATION =====
+        function calculateMetrics(tickets) {
+            const totalTickets = tickets.length;
+            const doneTickets = tickets.filter(t => t.status === 'Done').length;
+            const inProgressTickets = tickets.filter(t => t.status === 'In Progress').length;
+            const inReviewTickets = tickets.filter(t => t.status === 'In Review').length;
+            const todoTickets = tickets.filter(t => t.status === 'To Do').length;
+            const blockedTickets = tickets.filter(t => t.status === 'Blocked').length;
+
+            const percentComplete = totalTickets > 0 ? Math.round((doneTickets / totalTickets) * 100) : 0;
+            const percentInProgress = totalTickets > 0 ? Math.round((inProgressTickets / totalTickets) * 100) : 0;
+            const percentInReview = totalTickets > 0 ? Math.round((inReviewTickets / totalTickets) * 100) : 0;
+            const percentRemaining = totalTickets > 0 ? Math.round((todoTickets / totalTickets) * 100) : 0;
+            const percentBlocked = totalTickets > 0 ? Math.round((blockedTickets / totalTickets) * 100) : 0;
+
+            return {
+                totalTickets,
+                doneTickets,
+                inProgressTickets,
+                inReviewTickets,
+                todoTickets,
+                blockedTickets,
+                percentComplete,
+                percentInProgress,
+                percentInReview,
+                percentRemaining,
+                percentBlocked
+            };
+        }
+
+        function getEpicBreakdown(tickets) {
+            const epicMap = new Map();
+
+            tickets.forEach(ticket => {
+                // Use parentKey for grouping (unique identifier) or parentSummary, or fall back to epic field
+                const epicKey = ticket.parentKey || ticket.parentSummary || ticket.epic || 'Others';
+                const epicName = ticket.parentSummary || ticket.epic || 'Others';
+
+                if (!epicMap.has(epicKey)) {
+                    epicMap.set(epicKey, {
+                        epic: epicName,
+                        done: 0,
+                        inProgress: 0,
+                        inReview: 0,
+                        todo: 0,
+                        blocked: 0,
+                        total: 0
+                    });
+                }
+
+                const epicData = epicMap.get(epicKey);
+                epicData.total++;
+
+                switch (ticket.status) {
+                    case 'Done': epicData.done++; break;
+                    case 'In Progress': epicData.inProgress++; break;
+                    case 'In Review': epicData.inReview++; break;
+                    case 'To Do': epicData.todo++; break;
+                    case 'Blocked': epicData.blocked++; break;
+                }
+            });
+
+            return Array.from(epicMap.values()).sort((a, b) => b.total - a.total);
+        }
+
+        function getSprintProgress(tickets) {
+            if (tickets.length === 0) return { sprintNumber: 'N/A', data: [] };
+
+            // Get sprint number from tickets (use most common sprint value)
+            const sprintNumbers = tickets
+                .map(t => t.sprint)
+                .filter(Boolean);
+
+            let sprintNumber = 'Current Sprint';
+            if (sprintNumbers.length > 0) {
+                // Find most common sprint number
+                const sprintCounts = {};
+                sprintNumbers.forEach(s => {
+                    sprintCounts[s] = (sprintCounts[s] || 0) + 1;
+                });
+                sprintNumber = Object.keys(sprintCounts).reduce((a, b) =>
+                    sprintCounts[a] > sprintCounts[b] ? a : b
+                );
+            }
+
+            // Calculate current completion
+            const totalTickets = tickets.length;
+            const doneTickets = tickets.filter(t => t.status === 'Done').length;
+            const completionPercent = totalTickets > 0 ? Math.round((doneTickets / totalTickets) * 100) : 0;
+
+            // Return simple 3-point progress data
+            return {
+                sprintNumber,
+                data: [
+                    { label: 'Start', value: 0 },
+                    { label: 'Current', value: completionPercent },
+                    { label: 'Target', value: 100 }
+                ]
+            };
+        }
+
+        function getCurrentSprintMetrics(tickets) {
+            if (tickets.length === 0) return { sprintNumber: 'N/A', committed: 0, completed: 0 };
+
+            // Get sprint number from tickets
+            const sprintNumbers = tickets
+                .map(t => t.sprint)
+                .filter(Boolean);
+
+            let sprintNumber = 'Current Sprint';
+            if (sprintNumbers.length > 0) {
+                const sprintCounts = {};
+                sprintNumbers.forEach(s => {
+                    sprintCounts[s] = (sprintCounts[s] || 0) + 1;
+                });
+                sprintNumber = Object.keys(sprintCounts).reduce((a, b) =>
+                    sprintCounts[a] > sprintCounts[b] ? a : b
+                );
+            }
+
+            // Calculate totals (use story points if available, otherwise ticket count)
+            const totalPoints = tickets.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+            const completedPoints = tickets.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+
+            // Include In Progress, In Review, and In Testing in the "In Progress" bar
+            const inProgressStatuses = ['In Progress', 'In Review', 'In Testing'];
+            const inProgressPoints = tickets.filter(t => inProgressStatuses.includes(t.status)).reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+
+            const useTicketCount = totalPoints === 0;
+            const committed = useTicketCount ? tickets.length : totalPoints;
+            const completed = useTicketCount ? tickets.filter(t => t.status === 'Done').length : completedPoints;
+            const inProgress = useTicketCount ? tickets.filter(t => inProgressStatuses.includes(t.status)).length : inProgressPoints;
+            const unit = useTicketCount ? 'Tickets' : 'Story Points';
+
+            return {
+                sprintNumber,
+                committed,
+                completed,
+                inProgress,
+                unit
+            };
+        }
+
+        // ===== NEW EXECUTIVE SUMMARY FUNCTIONS =====
+
+        // Helper: Get recent completions from tickets
+        function getRecentCompletions(tickets, days = 7) {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+
+            return tickets.filter(ticket => {
+                const completedStatuses = ['Done', 'Completed', 'Resolved', 'Closed'];
+                if (!completedStatuses.includes(ticket.status)) return false;
+
+                // Check if updated in last N days
+                if (ticket.updated) {
+                    try {
+                        const updatedDate = new Date(ticket.updated);
+                        return updatedDate >= cutoffDate;
+                    } catch (e) {
+                        return false;
+                    }
+                }
+                return false;
+            }).sort((a, b) => {
+                const dateA = new Date(a.updated || 0);
+                const dateB = new Date(b.updated || 0);
+                return dateB - dateA; // Most recent first
+            });
+        }
+
+        // Generate Progress Summary Column
+        function generateProgressSummary(milestonesData) {
+            if (!milestonesData || milestonesData.length === 0) {
+                return '<div class="no-items-message">No milestone data available</div>';
+            }
+
+            let html = '';
+
+            // Show each milestone progress
+            milestonesData.forEach(milestone => {
+                const progress = calculateMilestoneProgress(milestone.deliverables);
+                const progressClass = progress >= 70 ? 'high' : progress >= 50 ? 'medium' : 'low';
+
+                html += `
+                    <div class="milestone-progress-item">
+                        <span class="milestone-id">${milestone.id}</span>
+                        <div class="milestone-progress-mini">
+                            <div class="milestone-progress-mini-fill ${progressClass}" style="width: ${progress}%">
+                                ${progress}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Calculate overall program health
+            const totalProgress = milestonesData.reduce((sum, m) => sum + calculateMilestoneProgress(m.deliverables), 0);
+            const overallProgress = Math.round(totalProgress / milestonesData.length);
+            const healthStatus = overallProgress >= 70 ? 'On Track' : overallProgress >= 50 ? 'In Progress' : 'Needs Attention';
+
+            html += `
+                <div class="summary-footer">
+                    <strong>Overall Program: ${overallProgress}%</strong><br>
+                    ${healthStatus}
+                </div>
+            `;
+
+            return html;
+        }
+
+        // Generate Wins Summary Column
+        function generateWinsSummary(milestonesData, tickets) {
+            let html = '';
+            let winsCount = 0;
+
+            // 1. Completed Milestones
+            const completedMilestones = milestonesData.filter(m => calculateMilestoneProgress(m.deliverables) === 100);
+            if (completedMilestones.length > 0) {
+                completedMilestones.forEach(milestone => {
+                    html += `
+                        <div class="win-item">
+                            <div class="win-icon">✓</div>
+                            <div class="win-content">
+                                <div class="win-title">${milestone.id} Complete</div>
+                                <div class="win-subtitle">${milestone.theme}</div>
+                            </div>
+                        </div>
+                    `;
+                    winsCount++;
+                });
+            }
+
+            // 2. Recent Completions (last 7 days)
+            const recentCompletions = getRecentCompletions(tickets, 7);
+            if (recentCompletions.length > 0) {
+                const topCompletions = recentCompletions.slice(0, 3); // Show top 3
+                topCompletions.forEach(ticket => {
+                    html += `
+                        <div class="win-item">
+                            <div class="win-icon">🎯</div>
+                            <div class="win-content">
+                                <div class="win-title">${ticket.key}: ${ticket.summary}</div>
+                                <div class="win-subtitle">${ticket.assignee || 'Unassigned'}</div>
+                            </div>
+                        </div>
+                    `;
+                    winsCount++;
+                });
+            }
+
+            // 3. Team Accomplishments - Top Contributor
+            if (recentCompletions.length > 0) {
+                const contributorMap = {};
+                recentCompletions.forEach(ticket => {
+                    const assignee = ticket.assignee || 'Unassigned';
+                    contributorMap[assignee] = (contributorMap[assignee] || 0) + 1;
+                });
+
+                const topContributor = Object.entries(contributorMap)
+                    .sort((a, b) => b[1] - a[1])[0];
+
+                if (topContributor && topContributor[0] !== 'Unassigned') {
+                    html += `
+                        <div class="win-item">
+                            <div class="win-icon">🌟</div>
+                            <div class="win-content">
+                                <div class="win-title">Top Contributor: ${topContributor[0]}</div>
+                                <div class="win-subtitle">${topContributor[1]} ${topContributor[1] === 1 ? 'completion' : 'completions'} this week</div>
+                            </div>
+                        </div>
+                    `;
+                    winsCount++;
+                }
+            }
+
+            if (winsCount === 0) {
+                return '<div class="no-items-message">No recent wins yet.<br>Keep pushing forward!</div>';
+            }
+
+            return html;
+        }
+
+        // Generate Blockers Summary Column
+        function generateBlockersSummary(risksData, milestonesData) {
+            let html = '';
+            let blockerCount = 0;
+
+            // 1. Critical Risks (Open + Priority 1)
+            const criticalRisks = risksData.filter(r => r.status === 'Open' && r.priority === 1);
+            if (criticalRisks.length > 0) {
+                const topRisks = criticalRisks.slice(0, 3); // Show top 3
+                topRisks.forEach(risk => {
+                    html += `
+                        <div class="blocker-item">
+                            <div class="blocker-icon">⚠️</div>
+                            <div class="blocker-content">
+                                <div class="blocker-title">${risk.details}</div>
+                                <div class="blocker-subtitle">Owner: ${risk.owner} | ${risk.type}</div>
+                            </div>
+                        </div>
+                    `;
+                    blockerCount++;
+                });
+            }
+
+            // 2. At-Risk Milestones (schedule slipped)
+            const atRiskMilestones = milestonesData.filter(m => m.originalDate && m.originalDate !== m.dueDate);
+            if (atRiskMilestones.length > 0) {
+                const topAtRisk = atRiskMilestones.slice(0, 2); // Show top 2
+                topAtRisk.forEach(milestone => {
+                    html += `
+                        <div class="blocker-item">
+                            <div class="blocker-icon">📅</div>
+                            <div class="blocker-content">
+                                <div class="blocker-title">${milestone.id}: Schedule Delayed</div>
+                                <div class="blocker-subtitle">New target: ${milestone.dueDate}</div>
+                            </div>
+                        </div>
+                    `;
+                    blockerCount++;
+                });
+            }
+
+            // Summary footer
+            const totalOpenRisks = risksData.filter(r => r.status === 'Open').length;
+            html += `
+                <div class="summary-footer">
+                    ${totalOpenRisks} Open Risk${totalOpenRisks !== 1 ? 's' : ''}<br>
+                    ${atRiskMilestones.length} Milestone${atRiskMilestones.length !== 1 ? 's' : ''} At Risk
+                </div>
+            `;
+
+            if (blockerCount === 0 && totalOpenRisks === 0) {
+                return '<div class="no-items-message">✓ No critical risks<br>All clear!</div>';
+            }
+
+            return html;
+        }
+
+        // ===== DATE-BASED PROGRESS CALCULATION =====
+        function calculateDateBasedProgress(tickets) {
+            const startDate = new Date('2026-01-01');
+
+            // Find the last due date from tickets
+            let endDate = new Date('2026-04-27'); // Default
+            tickets.forEach(ticket => {
+                if (ticket.dueDate) {
+                    const dueDate = new Date(ticket.dueDate);
+                    if (dueDate > endDate) {
+                        endDate = dueDate;
+                    }
+                }
+            });
+
+            const today = new Date();
+            const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            const elapsedDays = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+            const progressPercent = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
+
+            return {
+                progressPercent,
+                startDate: startDate.toLocaleDateString(),
+                endDate: endDate.toLocaleDateString(),
+                elapsedDays,
+                totalDays
+            };
+        }
+
+        // ===== UI RENDERING =====
+        function renderMetrics(metrics, dateProgress) {
+            const metricsGrid = document.getElementById('metricsGrid');
+            metricsGrid.innerHTML = `
+                <div class="metric-card done ${activeFilter === 'all' ? 'active' : ''}" data-filter="all">
+                    <div class="metric-label">Total Tickets</div>
+                    <div class="metric-value">${metrics.totalTickets}</div>
+                </div>
+                <div class="metric-card done ${activeFilter === 'done' ? 'active' : ''}" data-filter="done">
+                    <div class="metric-label">Completed</div>
+                    <div class="metric-value">${metrics.percentComplete}%</div>
+                    <div class="metric-subtext">${metrics.doneTickets} tickets</div>
+                </div>
+                <div class="metric-card in-progress ${activeFilter === 'in-progress' ? 'active' : ''}" data-filter="in-progress">
+                    <div class="metric-label">In Progress</div>
+                    <div class="metric-value">${metrics.percentInProgress}%</div>
+                    <div class="metric-subtext">${metrics.inProgressTickets} tickets</div>
+                </div>
+                <div class="metric-card in-review ${activeFilter === 'in-review' ? 'active' : ''}" data-filter="in-review">
+                    <div class="metric-label">In Testing</div>
+                    <div class="metric-value">${metrics.percentInReview}%</div>
+                    <div class="metric-subtext">${metrics.inReviewTickets} tickets</div>
+                </div>
+                <div class="metric-card todo ${activeFilter === 'todo' ? 'active' : ''}" data-filter="todo">
+                    <div class="metric-label">To Do</div>
+                    <div class="metric-value">${metrics.percentRemaining}%</div>
+                    <div class="metric-subtext">${metrics.todoTickets} tickets</div>
+                </div>
+                <div class="metric-card blocked ${activeFilter === 'blocked' ? 'active' : ''}" data-filter="blocked">
+                    <div class="metric-label">Blocked</div>
+                    <div class="metric-value">${metrics.blockedTickets}</div>
+                    <div class="metric-subtext">${metrics.percentBlocked}% of total</div>
+                </div>
+            `;
+
+            // Update progress bar with date-based progress
+            if (dateProgress) {
+                document.getElementById('progressPercent').textContent = `${dateProgress.progressPercent}%`;
+                document.getElementById('progressFill').style.width = `${dateProgress.progressPercent}%`;
+                document.getElementById('progressLabel').textContent = `Sprint Progress (${dateProgress.startDate} - ${dateProgress.endDate})`;
+            } else {
+                document.getElementById('progressPercent').textContent = `${metrics.percentComplete}%`;
+                document.getElementById('progressFill').style.width = `${metrics.percentComplete}%`;
+            }
+
+            // Add click event listeners to metric cards
+            document.querySelectorAll('.metric-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const filter = card.dataset.filter;
+                    handleMetricCardClick(filter);
+                });
+            });
+        }
+
+        function handleMetricCardClick(filter) {
+            // Toggle filter: if clicking the same card, clear filter
+            if (activeFilter === filter) {
+                activeFilter = null;
+                filteredTickets = allTickets;
+            } else {
+                activeFilter = filter;
+
+                if (filter === 'all') {
+                    filteredTickets = allTickets;
+                } else {
+                    // Map filter to status
+                    const statusMap = {
+                        'done': 'Done',
+                        'in-progress': 'In Progress',
+                        'in-review': 'In Review',
+                        'todo': 'To Do',
+                        'blocked': 'Blocked'
+                    };
+
+                    const status = statusMap[filter];
+                    filteredTickets = allTickets.filter(ticket => ticket.status === status);
+                }
+            }
+
+            // Clear search box
+            document.getElementById('searchBox').value = '';
+
+            // Update filter badge
+            updateFilterBadge();
+
+            // Re-render with updated filter
+            const metrics = calculateMetrics(allTickets);
+            const dateProgress = calculateDateBasedProgress(allTickets);
+            renderMetrics(metrics, dateProgress);
+            renderIssueTable(filteredTickets);
+        }
+
+        function updateFilterBadge() {
+            const badge = document.getElementById('activeFilterBadge');
+            const filterText = document.getElementById('filterText');
+
+            if (activeFilter && activeFilter !== 'all') {
+                const filterNames = {
+                    'done': 'Showing: Completed',
+                    'in-progress': 'Showing: In Progress',
+                    'in-review': 'Showing: In Review',
+                    'todo': 'Showing: To Do',
+                    'blocked': 'Showing: Blocked'
+                };
+                filterText.textContent = filterNames[activeFilter] || 'Filter active';
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Main Render Function for New Executive Summary
+        function renderExecutiveSummary(milestonesData, tickets, risksData) {
+            const gridContainer = document.getElementById('executiveSummaryGrid');
+
+            if (!gridContainer) {
+                console.error('Executive summary grid container not found');
+                return;
+            }
+
+            // Generate each column
+            const progressHTML = generateProgressSummary(milestonesData);
+            const winsHTML = generateWinsSummary(milestonesData, tickets);
+            const blockersHTML = generateBlockersSummary(risksData, milestonesData);
+
+            // Build 3-column layout
+            gridContainer.innerHTML = `
+                <div class="summary-column progress-column">
+                    <h3>📊 Progress Overview</h3>
+                    ${progressHTML}
+                </div>
+                <div class="summary-column wins-column">
+                    <h3>🎉 Recent Wins</h3>
+                    ${winsHTML}
+                </div>
+                <div class="summary-column blockers-column">
+                    <h3>🚨 Risks & Blockers</h3>
+                    ${blockersHTML}
+                </div>
+            `;
+        }
+
+        function renderStatusDonutChart(metrics) {
+            const ctx = document.getElementById('statusDonutChart');
+
+            if (charts.statusDonut) {
+                charts.statusDonut.destroy();
+            }
+
+            const data = [
+                { name: 'Done', value: metrics.doneTickets, color: '#10b981' },
+                { name: 'In Progress', value: metrics.inProgressTickets, color: '#3b82f6' },
+                { name: 'In Review', value: metrics.inReviewTickets, color: '#f59e0b' },
+                { name: 'To Do', value: metrics.todoTickets, color: '#6b7280' },
+                { name: 'Blocked', value: metrics.blockedTickets, color: '#ef4444' }
+            ].filter(item => item.value > 0);
+
+            charts.statusDonut = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        data: data.map(d => d.value),
+                        backgroundColor: data.map(d => d.color),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderEpicBreakdownChart(epicBreakdown) {
+            const ctx = document.getElementById('epicBreakdownChart');
+
+            if (charts.epicBreakdown) {
+                charts.epicBreakdown.destroy();
+            }
+
+            const epics = epicBreakdown; // Show ALL epics
+
+            charts.epicBreakdown = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: epics.map(e => e.epic),
+                    datasets: [
+                        {
+                            label: 'Done',
+                            data: epics.map(e => e.done),
+                            backgroundColor: '#10b981'
+                        },
+                        {
+                            label: 'In Progress',
+                            data: epics.map(e => e.inProgress),
+                            backgroundColor: '#3b82f6'
+                        },
+                        {
+                            label: 'In Review',
+                            data: epics.map(e => e.inReview),
+                            backgroundColor: '#f59e0b'
+                        },
+                        {
+                            label: 'To Do',
+                            data: epics.map(e => e.todo),
+                            backgroundColor: '#6b7280'
+                        },
+                        {
+                            label: 'Blocked',
+                            data: epics.map(e => e.blocked),
+                            backgroundColor: '#ef4444'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderSprintProgressChart(sprintProgress) {
+            const ctx = document.getElementById('weeklyProgressChart');
+
+            if (charts.weeklyProgress) {
+                charts.weeklyProgress.destroy();
+            }
+
+            // Update chart title
+            const chartTitle = document.querySelector('#chartsSection .chart-card:nth-child(3) .chart-title');
+            if (chartTitle) {
+                chartTitle.textContent = `Sprint ${sprintProgress.sprintNumber} Progress`;
+            }
+
+            charts.weeklyProgress = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sprintProgress.data.map(d => d.label),
+                    datasets: [
+                        {
+                            label: 'Completion %',
+                            data: sprintProgress.data.map(d => d.value),
+                            backgroundColor: [
+                                '#e5e7eb',  // Start - gray
+                                '#3b82f6',  // Current - blue
+                                '#10b981'   // Target - green
+                            ],
+                            borderWidth: 2,
+                            borderColor: [
+                                '#9ca3af',
+                                '#2563eb',
+                                '#059669'
+                            ]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: value => value + '%'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCurrentSprintChart(sprintMetrics) {
+            const ctx = document.getElementById('sprintVelocityChart');
+
+            if (charts.sprintVelocity) {
+                charts.sprintVelocity.destroy();
+            }
+
+            // Chart title is now static in HTML as "Total Ticket Status"
+
+            charts.sprintVelocity = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [sprintMetrics.sprintNumber],
+                    datasets: [
+                        {
+                            label: 'Committed',
+                            data: [sprintMetrics.committed],
+                            backgroundColor: '#6b7280'
+                        },
+                        {
+                            label: 'In Progress',
+                            data: [sprintMetrics.inProgress],
+                            backgroundColor: '#3b82f6'
+                        },
+                        {
+                            label: 'Completed',
+                            data: [sprintMetrics.completed],
+                            backgroundColor: '#10b981'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: sprintMetrics.unit
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'dataLabels',
+                    afterDatasetsDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            if (!meta.hidden) {
+                                meta.data.forEach((element, index) => {
+                                    ctx.fillStyle = '#1f2937';
+                                    const fontSize = 14;
+                                    const fontStyle = 'bold';
+                                    const fontFamily = 'Arial';
+                                    ctx.font = fontStyle + ' ' + fontSize + 'px ' + fontFamily;
+
+                                    const dataString = dataset.data[index].toString();
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+
+                                    const padding = 5;
+                                    const position = element.tooltipPosition();
+                                    ctx.fillText(dataString, position.x, position.y - fontSize / 2 - padding);
+                                });
+                            }
+                        });
+                    }
+                }]
+            });
+        }
+
+        function renderAssigneeBreakdownChart(tickets) {
+            const ctx = document.getElementById('assigneeBreakdownChart');
+
+            if (charts.assigneeBreakdown) {
+                charts.assigneeBreakdown.destroy();
+            }
+
+            // Count tickets per assignee
+            const assigneeMap = new Map();
+            tickets.forEach(ticket => {
+                const assignee = ticket.assignee || 'Unassigned';
+                if (!assigneeMap.has(assignee)) {
+                    assigneeMap.set(assignee, {
+                        done: 0,
+                        inProgress: 0,
+                        inReview: 0,
+                        todo: 0,
+                        blocked: 0,
+                        total: 0
+                    });
+                }
+
+                const data = assigneeMap.get(assignee);
+                data.total++;
+
+                switch (ticket.status) {
+                    case 'Done': data.done++; break;
+                    case 'In Progress': data.inProgress++; break;
+                    case 'In Review': data.inReview++; break;
+                    case 'To Do': data.todo++; break;
+                    case 'Blocked': data.blocked++; break;
+                }
+            });
+
+            // Sort by total and take top 6
+            const assignees = Array.from(assigneeMap.entries())
+                .sort((a, b) => b[1].total - a[1].total)
+                .slice(0, 6);
+
+            charts.assigneeBreakdown = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: assignees.map(a => a[0]),
+                    datasets: [
+                        {
+                            label: 'Done',
+                            data: assignees.map(a => a[1].done),
+                            backgroundColor: '#10b981'
+                        },
+                        {
+                            label: 'In Progress',
+                            data: assignees.map(a => a[1].inProgress),
+                            backgroundColor: '#3b82f6'
+                        },
+                        {
+                            label: 'In Review',
+                            data: assignees.map(a => a[1].inReview),
+                            backgroundColor: '#f59e0b'
+                        },
+                        {
+                            label: 'To Do',
+                            data: assignees.map(a => a[1].todo),
+                            backgroundColor: '#6b7280'
+                        },
+                        {
+                            label: 'Blocked',
+                            data: assignees.map(a => a[1].blocked),
+                            backgroundColor: '#ef4444'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderPriorityDistributionChart(tickets) {
+            const ctx = document.getElementById('priorityDistributionChart');
+
+            if (charts.priorityDistribution) {
+                charts.priorityDistribution.destroy();
+            }
+
+            // Count tickets by priority
+            const priorityMap = new Map();
+            tickets.forEach(ticket => {
+                const priority = ticket.priority || 'Not Set';
+                priorityMap.set(priority, (priorityMap.get(priority) || 0) + 1);
+            });
+
+            const priorityOrder = ['High', 'Medium', 'Low', 'Not Set'];
+            const priorityColors = {
+                'High': '#ef4444',
+                'Medium': '#f59e0b',
+                'Low': '#10b981',
+                'Not Set': '#6b7280'
+            };
+
+            const data = priorityOrder
+                .map(priority => ({
+                    name: priority,
+                    value: priorityMap.get(priority) || 0,
+                    color: priorityColors[priority]
+                }))
+                .filter(item => item.value > 0);
+
+            charts.priorityDistribution = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        data: data.map(d => d.value),
+                        backgroundColor: data.map(d => d.color),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCriticalPathTable(tickets) {
+            const tableContainer = document.getElementById('criticalPathTable');
+
+            // Filter tickets that have labels (critical path items)
+            const criticalPathItems = tickets.filter(t => t.labels && t.labels.trim() !== '');
+
+            // Sort by due date (earliest first)
+            criticalPathItems.sort((a, b) => {
+                if (!a.dueDate) return 1;
+                if (!b.dueDate) return -1;
+                return new Date(a.dueDate) - new Date(b.dueDate);
+            });
+
+            if (criticalPathItems.length === 0) {
+                tableContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #6b7280;">No critical path items found</p>';
+                return;
+            }
+
+            // Generate table HTML
+            const tableHTML = `
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                    <thead>
+                        <tr>
+                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; position: sticky; top: 0;">Summary</th>
+                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; width: 120px; position: sticky; top: 0;">Status</th>
+                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; width: 120px; position: sticky; top: 0;">Due Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${criticalPathItems.map(item => {
+                            const statusClass = item.status.toLowerCase().replace(/ /g, '-');
+                            const dueDate = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Not set';
+                            return `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 0.75rem;">${item.summary}</td>
+                                    <td style="padding: 0.75rem;"><span class="status-badge status-${statusClass}">${item.status}</span></td>
+                                    <td style="padding: 0.75rem;">${dueDate}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            tableContainer.innerHTML = tableHTML;
+        }
+
+        // ===== MILESTONE ACCORDION RENDER FUNCTION =====
+        function calculateMilestoneProgress(deliverables) {
+            if (!deliverables || deliverables.length === 0) return 0;
+            const totalProgress = deliverables.reduce((sum, d) => sum + d.progress, 0);
+            return Math.round(totalProgress / deliverables.length);
+        }
+
+        function renderMilestoneAccordion() {
+            const accordionContainer = document.getElementById('milestoneAccordion');
+
+            if (milestonesData.length === 0) {
+                accordionContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #6b7280;">No milestone data available</p>';
+                return;
+            }
+
+            // Generate table with expandable rows
+            let tableHTML = `
+                <table class="milestone-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Milestone</th>
+                            <th style="width: 200px;">Period</th>
+                            <th>Theme</th>
+                            <th style="width: 200px;">Progress Update</th>
+                            <th style="width: 150px;">Schedule Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            milestonesData.forEach((milestone, index) => {
+                const progress = calculateMilestoneProgress(milestone.deliverables);
+                const progressClass = progress >= 70 ? 'high' : progress >= 50 ? 'medium' : 'low';
+
+                // Determine schedule status and class
+                let scheduleStatus = '';
+                let scheduleClass = 'schedule-on-track';
+
+                if (progress === 100) {
+                    scheduleStatus = 'Completed';
+                    scheduleClass = 'schedule-completed';
+                } else if (milestone.originalDate && milestone.originalDate !== milestone.dueDate) {
+                    scheduleStatus = 'Late';
+                    scheduleClass = 'schedule-late';
+                } else {
+                    scheduleStatus = `In Progress - ${progress}%`;
+                    scheduleClass = 'schedule-on-track';
+                }
+
+                // Table row (clickable)
+                tableHTML += `
+                    <tr class="milestone-row" onclick="toggleMilestoneAccordion('${milestone.id}')" style="cursor: pointer;">
+                        <td><span class="milestone-id">${milestone.id}</span></td>
+                        <td>
+                            ${milestone.originalDate ? `<span class="period-strikethrough">${milestone.originalDate}</span><br>` : ''}
+                            <span class="period-text">${milestone.dueDate}</span>
+                        </td>
+                        <td>${milestone.theme}</td>
+                        <td>
+                            <div>${progress}%</div>
+                            <div class="progress-bar-container-milestone">
+                                <div class="progress-bar-fill-milestone ${progressClass}" style="width: ${progress}%">
+                                    ${progress}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="schedule-badge ${scheduleClass}">${scheduleStatus}</span>
+                        </td>
+                    </tr>
+                `;
+
+                // Expandable form row (hidden by default)
+                tableHTML += `
+                    <tr class="milestone-accordion-content-row" id="accordion-row-${milestone.id}" style="display: none;">
+                        <td colspan="5" style="padding: 0; background: #f9fafb;">
+                            <div class="milestone-accordion-content-wrapper" style="padding: 1.5rem;">
+                                <form class="milestone-form" id="form-${milestone.id}">
+                                    <!-- Dates Section -->
+                                    <div class="milestone-form-row">
+                                        <div class="milestone-form-group">
+                                            <label>Original Due Date</label>
+                                            <input type="text" class="milestone-input" name="originalDate"
+                                                   value="${milestone.originalDate || ''}"
+                                                   placeholder="e.g., November 30, 2025">
+                                        </div>
+                                        <div class="milestone-form-group">
+                                            <label>Target Due Date <span style="color: #ef4444;">*</span></label>
+                                            <input type="text" class="milestone-input" name="dueDate"
+                                                   value="${milestone.dueDate}"
+                                                   placeholder="e.g., 01/30/26" required>
+                                        </div>
+                                    </div>
+
+                                    <!-- Theme Section -->
+                                    <div class="milestone-form-group">
+                                        <label>Milestone Theme <span style="color: #ef4444;">*</span></label>
+                                        <textarea class="milestone-textarea" name="theme" rows="2" required>${milestone.theme}</textarea>
+                                    </div>
+
+                                    <!-- Deliverables Section -->
+                                    <div class="deliverables-section">
+                                        <h4 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Deliverables</h4>
+                                        <div id="deliverables-${milestone.id}">
+                                            ${milestone.deliverables.map((deliverable, dIndex) => `
+                                                <div class="deliverable-item" data-deliverable-id="${deliverable.id}">
+                                                    <div class="deliverable-header">
+                                                        <span class="deliverable-number">#${dIndex + 1}</span>
+                                                        <button type="button" class="remove-deliverable-btn"
+                                                                onclick="event.stopPropagation(); removeDeliverable('${milestone.id}', '${deliverable.id}')">
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                    <div class="milestone-form-group">
+                                                        <label>Deliverable Name</label>
+                                                        <input type="text" class="milestone-input"
+                                                               name="deliverable-name-${deliverable.id}"
+                                                               value="${deliverable.name}" required>
+                                                    </div>
+                                                    <div class="milestone-form-row">
+                                                        <div class="milestone-form-group">
+                                                            <label>Status</label>
+                                                            <select class="milestone-select" name="deliverable-status-${deliverable.id}"
+                                                                    onchange="updateDeliverableProgress('${milestone.id}', '${deliverable.id}', this.value)">
+                                                                <option value="Not Started" ${deliverable.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                                                                <option value="In Progress" ${deliverable.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                                                <option value="Complete" ${deliverable.status === 'Complete' ? 'selected' : ''}>Complete</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="milestone-form-group">
+                                                            <label>Progress %</label>
+                                                            <input type="number" class="milestone-input"
+                                                                   name="deliverable-progress-${deliverable.id}"
+                                                                   id="progress-${deliverable.id}"
+                                                                   value="${deliverable.progress}"
+                                                                   min="0" max="100"
+                                                                   ${deliverable.status !== 'In Progress' ? 'readonly' : ''}>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <button type="button" class="add-deliverable-btn"
+                                                onclick="event.stopPropagation(); addDeliverable('${milestone.id}')">
+                                            + Add Deliverable
+                                        </button>
+                                    </div>
+
+                                    <!-- Save Button -->
+                                    <div style="margin-top: 1.5rem; text-align: right;">
+                                        <button type="submit" class="save-milestone-btn">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            accordionContainer.innerHTML = tableHTML;
+
+            // Attach form submit handlers
+            milestonesData.forEach(milestone => {
+                const form = document.getElementById(`form-${milestone.id}`);
+                if (form) {
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        saveMilestoneChanges(milestone.id);
+                    });
+                }
+            });
+        }
+
+        // ===== MILESTONE ACCORDION HELPER FUNCTIONS =====
+        function toggleMilestoneAccordion(milestoneId) {
+            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
+            if (accordionRow) {
+                // Toggle visibility
+                if (accordionRow.style.display === 'none' || accordionRow.style.display === '') {
+                    accordionRow.style.display = 'table-row';
+                } else {
+                    accordionRow.style.display = 'none';
+                }
+            }
+        }
+
+        function updateDeliverableProgress(milestoneId, deliverableId, status) {
+            const progressInput = document.getElementById(`progress-${deliverableId}`);
+            if (!progressInput) return;
+
+            // Auto-set progress based on status
+            if (status === 'Not Started') {
+                progressInput.value = 0;
+                progressInput.readOnly = true;
+            } else if (status === 'Complete') {
+                progressInput.value = 100;
+                progressInput.readOnly = true;
+            } else if (status === 'In Progress') {
+                progressInput.readOnly = false;
+                // Keep current value or default to 50 if it's 0 or 100
+                if (progressInput.value == 0 || progressInput.value == 100) {
+                    progressInput.value = 50;
+                }
+            }
+        }
+
+        function addDeliverable(milestoneId) {
+            const milestone = milestonesData.find(m => m.id === milestoneId);
+            if (!milestone) return;
+
+            // Generate new deliverable ID
+            const newId = `${milestoneId.toLowerCase()}-${Date.now()}`;
+            const newDeliverable = {
+                id: newId,
+                name: '',
+                status: 'Not Started',
+                progress: 0
+            };
+
+            milestone.deliverables.push(newDeliverable);
+
+            // Re-render the table to show the new deliverable
+            renderMilestoneAccordion();
+
+            // Keep the accordion row open
+            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
+            if (accordionRow) {
+                accordionRow.style.display = 'table-row';
+            }
+
+            // Focus on the new deliverable's name input
+            setTimeout(() => {
+                const newInput = document.querySelector(`input[name="deliverable-name-${newId}"]`);
+                if (newInput) {
+                    newInput.focus();
+                    newInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        function removeDeliverable(milestoneId, deliverableId) {
+            const milestone = milestonesData.find(m => m.id === milestoneId);
+            if (!milestone) return;
+
+            // Don't allow removing the last deliverable
+            if (milestone.deliverables.length <= 1) {
+                alert('Each milestone must have at least one deliverable.');
+                return;
+            }
+
+            // Confirm deletion
+            if (!confirm('Are you sure you want to remove this deliverable?')) {
+                return;
+            }
+
+            // Remove deliverable from array
+            milestone.deliverables = milestone.deliverables.filter(d => d.id !== deliverableId);
+
+            // Re-render the table
+            renderMilestoneAccordion();
+
+            // Keep accordion row open
+            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
+            if (accordionRow) {
+                accordionRow.style.display = 'table-row';
+            }
+        }
+
+        function saveMilestoneChanges(milestoneId) {
+            const milestone = milestonesData.find(m => m.id === milestoneId);
+            if (!milestone) return;
+
+            const form = document.getElementById(`form-${milestoneId}`);
+            if (!form) return;
+
+            // Get form data
+            const formData = new FormData(form);
+
+            // Update milestone basic info
+            milestone.originalDate = formData.get('originalDate') || null;
+            milestone.dueDate = formData.get('dueDate');
+            milestone.theme = formData.get('theme');
+
+            // Update deliverables
+            milestone.deliverables.forEach(deliverable => {
+                const name = formData.get(`deliverable-name-${deliverable.id}`);
+                const status = formData.get(`deliverable-status-${deliverable.id}`);
+                const progress = parseInt(formData.get(`deliverable-progress-${deliverable.id}`)) || 0;
+
+                deliverable.name = name;
+                deliverable.status = status;
+                deliverable.progress = progress;
+            });
+
+            // Save to localStorage
+            saveMilestoneDataToStorage(milestonesData);
+
+            // Re-render the table to update the progress bar
+            renderMilestoneAccordion();
+
+            // Keep the accordion row open
+            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
+            if (accordionRow) {
+                accordionRow.style.display = 'table-row';
+            }
+
+            // Show success message in the re-rendered form
+            setTimeout(() => {
+                const saveBtn = document.querySelector(`#form-${milestoneId} .save-milestone-btn`);
+                if (saveBtn) {
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '✓ Saved!';
+                    saveBtn.style.background = '#10b981';
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.style.background = '';
+                    }, 2000);
+                }
+            }, 100);
+        }
+
+        function renderRisksTable() {
+            const tableContainer = document.getElementById('risksTable');
+
+            let tableHTML = `
+                <div class="edit-controls" style="margin-bottom: 1rem; text-align: right;">
+                    <button class="add-deliverable-btn" onclick="addRisk()" style="width: auto; padding: 0.5rem 1.5rem;">
+                        + Add New Risk/Blocker
+                    </button>
+                </div>
+            `;
+
+            if (risksData.length === 0) {
+                tableHTML += '<p style="text-align: center; padding: 2rem; color: #6b7280;">No risks or blockers. Click "Add New Risk/Blocker" to add one.</p>';
+                tableContainer.innerHTML = tableHTML;
+                return;
+            }
+
+            tableHTML += `
+                <table class="milestone-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Open/Monitor</th>
+                            <th style="width: 120px;">Risk/Issue/Block</th>
+                            <th>Details</th>
+                            <th style="width: 100px;">Priority</th>
+                            <th style="width: 120px;">Owner</th>
+                            <th>Status/Impact/Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            risksData.forEach((risk, index) => {
+                // Table row (clickable)
+                tableHTML += `
+                    <tr class="milestone-row" onclick="toggleRiskAccordion('${risk.id}')" style="cursor: pointer;">
+                        <td>${risk.status}</td>
+                        <td><strong>${risk.type}</strong></td>
+                        <td>${risk.details}</td>
+                        <td>
+                            <span class="priority-badge priority-${risk.priority}">
+                                ${risk.priority} ${risk.priority === 1 ? 'High' : risk.priority === 2 ? 'Med' : 'Low'}
+                            </span>
+                        </td>
+                        <td>${risk.owner}</td>
+                        <td style="white-space: pre-wrap;">${risk.statusImpact}</td>
+                    </tr>
+                `;
+
+                // Expandable form row (hidden by default)
+                tableHTML += `
+                    <tr class="milestone-accordion-content-row" id="risk-accordion-row-${risk.id}" style="display: none;">
+                        <td colspan="6" style="padding: 0; background: #f9fafb;">
+                            <div class="milestone-accordion-content-wrapper" style="padding: 1.5rem;">
+                                <form class="milestone-form" id="risk-form-${risk.id}">
+                                    <div class="milestone-form-row">
+                                        <div class="milestone-form-group">
+                                            <label>Status <span style="color: #ef4444;">*</span></label>
+                                            <select class="milestone-select" name="status" required>
+                                                <option value="Open" ${risk.status === 'Open' ? 'selected' : ''}>Open</option>
+                                                <option value="Monitor" ${risk.status === 'Monitor' ? 'selected' : ''}>Monitor</option>
+                                                <option value="Closed" ${risk.status === 'Closed' ? 'selected' : ''}>Closed</option>
+                                            </select>
+                                        </div>
+                                        <div class="milestone-form-group">
+                                            <label>Type <span style="color: #ef4444;">*</span></label>
+                                            <select class="milestone-select" name="type" required>
+                                                <option value="Risk" ${risk.type === 'Risk' ? 'selected' : ''}>Risk</option>
+                                                <option value="Issue" ${risk.type === 'Issue' ? 'selected' : ''}>Issue</option>
+                                                <option value="Block" ${risk.type === 'Block' ? 'selected' : ''}>Block</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="milestone-form-group">
+                                        <label>Details <span style="color: #ef4444;">*</span></label>
+                                        <textarea class="milestone-textarea" name="details" rows="2" required>${risk.details}</textarea>
+                                    </div>
+
+                                    <div class="milestone-form-row">
+                                        <div class="milestone-form-group">
+                                            <label>Priority <span style="color: #ef4444;">*</span></label>
+                                            <select class="milestone-select" name="priority" required>
+                                                <option value="1" ${risk.priority === 1 ? 'selected' : ''}>1 - High</option>
+                                                <option value="2" ${risk.priority === 2 ? 'selected' : ''}>2 - Medium</option>
+                                                <option value="3" ${risk.priority === 3 ? 'selected' : ''}>3 - Low</option>
+                                            </select>
+                                        </div>
+                                        <div class="milestone-form-group">
+                                            <label>Owner <span style="color: #ef4444;">*</span></label>
+                                            <input type="text" class="milestone-input" name="owner"
+                                                   value="${risk.owner}" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="milestone-form-group">
+                                        <label>Status/Impact/Decision <span style="color: #ef4444;">*</span></label>
+                                        <textarea class="milestone-textarea" name="statusImpact" rows="4" required>${risk.statusImpact}</textarea>
+                                    </div>
+
+                                    <div style="margin-top: 1.5rem; display: flex; justify-content: space-between;">
+                                        <button type="button" class="remove-deliverable-btn"
+                                                onclick="event.stopPropagation(); removeRisk('${risk.id}')"
+                                                style="background: #ef4444;">
+                                            Delete Risk
+                                        </button>
+                                        <button type="submit" class="save-milestone-btn">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+
+            tableContainer.innerHTML = tableHTML;
+
+            // Attach form submit handlers
+            risksData.forEach(risk => {
+                const form = document.getElementById(`risk-form-${risk.id}`);
+                if (form) {
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        saveRiskChanges(risk.id);
+                    });
+                }
+            });
+        }
+
+        // ===== RISKS & BLOCKERS HELPER FUNCTIONS =====
+        function toggleRiskAccordion(riskId) {
+            const accordionRow = document.getElementById(`risk-accordion-row-${riskId}`);
+            if (accordionRow) {
+                // Toggle visibility
+                if (accordionRow.style.display === 'none' || accordionRow.style.display === '') {
+                    accordionRow.style.display = 'table-row';
+                } else {
+                    accordionRow.style.display = 'none';
+                }
+            }
+        }
+
+        function addRisk() {
+            // Generate new risk ID
+            const newId = `risk-${Date.now()}`;
+            const newRisk = {
+                id: newId,
+                status: 'Open',
+                type: 'Risk',
+                details: '',
+                priority: 2,
+                owner: '',
+                statusImpact: ''
+            };
+
+            risksData.push(newRisk);
+
+            // Re-render the table
+            renderRisksTable();
+
+            // Open the new risk's accordion row
+            const accordionRow = document.getElementById(`risk-accordion-row-${newId}`);
+            if (accordionRow) {
+                accordionRow.style.display = 'table-row';
+            }
+
+            // Focus on the details textarea
+            setTimeout(() => {
+                const detailsInput = document.querySelector(`#risk-form-${newId} textarea[name="details"]`);
+                if (detailsInput) {
+                    detailsInput.focus();
+                    detailsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        function removeRisk(riskId) {
+            // Confirm deletion
+            if (!confirm('Are you sure you want to delete this risk/blocker?')) {
+                return;
+            }
+
+            // Remove risk from array
+            const index = risksData.findIndex(r => r.id === riskId);
+            if (index !== -1) {
+                risksData.splice(index, 1);
+            }
+
+            // Save to localStorage
+            saveRisksDataToStorage(risksData);
+
+            // Re-render the table
+            renderRisksTable();
+        }
+
+        function saveRiskChanges(riskId) {
+            const risk = risksData.find(r => r.id === riskId);
+            if (!risk) return;
+
+            const form = document.getElementById(`risk-form-${riskId}`);
+            if (!form) return;
+
+            // Get form data
+            const formData = new FormData(form);
+
+            // Update risk
+            risk.status = formData.get('status');
+            risk.type = formData.get('type');
+            risk.details = formData.get('details');
+            risk.priority = parseInt(formData.get('priority'));
+            risk.owner = formData.get('owner');
+            risk.statusImpact = formData.get('statusImpact');
+
+            // Save to localStorage
+            saveRisksDataToStorage(risksData);
+
+            // Re-render the table
+            renderRisksTable();
+
+            // Keep the accordion row open
+            const accordionRow = document.getElementById(`risk-accordion-row-${riskId}`);
+            if (accordionRow) {
+                accordionRow.style.display = 'table-row';
+            }
+
+            // Show success message
+            setTimeout(() => {
+                const saveBtn = document.querySelector(`#risk-form-${riskId} .save-milestone-btn`);
+                if (saveBtn) {
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '✓ Saved!';
+                    saveBtn.style.background = '#10b981';
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.style.background = '';
+                    }, 2000);
+                }
+            }, 100);
+        }
+
+        function renderIssueTable(tickets) {
+            const tbody = document.getElementById('issueTableBody');
+
+            if (tickets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #6b7280;">No tickets found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = tickets.map(ticket => {
+                const statusClass = ticket.status.toLowerCase().replace(/ /g, '-');
+                const priorityClass = ticket.priority ? `priority-${ticket.priority.toLowerCase()}` : '';
+                const updatedDate = ticket.updated ? new Date(ticket.updated).toLocaleDateString() : '-';
+
+                return `
+                    <tr>
+                        <td><strong>${ticket.issueKey}</strong></td>
+                        <td>${ticket.summary}</td>
+                        <td><span class="status-badge status-${statusClass}">${ticket.status}</span></td>
+                        <td>${ticket.assignee || 'Unassigned'}</td>
+                        <td class="${priorityClass}">${ticket.priority || '-'}</td>
+                        <td>${ticket.epic || '-'}</td>
+                        <td>${updatedDate}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ===== DATA LOADING =====
+        async function loadData(csvText, fileName = 'latest.csv') {
+            try {
+                allTickets = await parseCSV(csvText, fileName);
+                filteredTickets = allTickets;
+
+                // Check if this is demo data
+                isUsingDemoData = isDemoData(allTickets, fileName);
+
+                if (isUsingDemoData) {
+                    showDemoWarning();
+                } else {
+                    hideDemoWarning();
+                }
+
+                const metrics = calculateMetrics(allTickets);
+                const dateProgress = calculateDateBasedProgress(allTickets);
+                const epicBreakdown = getEpicBreakdown(allTickets);
+                const sprintProgress = getSprintProgress(allTickets);
+                const sprintMetrics = getCurrentSprintMetrics(allTickets);
+
+                renderExecutiveSummary(milestonesData, allTickets, risksData);
+                renderMetrics(metrics, dateProgress);
+                renderStatusDonutChart(metrics);
+                renderEpicBreakdownChart(epicBreakdown);
+                renderCurrentSprintChart(sprintMetrics);
+                renderCriticalPathTable(allTickets);
+                renderMilestoneAccordion();
+                renderRisksTable();
+                renderIssueTable(allTickets);
+
+                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+
+                return true;
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading data: ' + error.message);
+                return false;
+            }
+        }
+
+        async function loadDefaultData() {
+            try {
+                const response = await fetch('latest.csv');
+                if (response.ok) {
+                    const csvText = await response.text();
+                    await loadData(csvText, 'latest.csv');
+                } else {
+                    throw new Error('Could not load latest.csv');
+                }
+            } catch (error) {
+                console.warn('Could not load default CSV, using empty state');
+                document.getElementById('lastUpdated').textContent = 'No data loaded - please upload a CSV file';
+            }
+        }
+
+        // ===== EVENT HANDLERS =====
+        document.getElementById('searchBox').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+
+            // Reset active filter when user types
+            if (searchTerm !== '') {
+                activeFilter = null;
+                const metrics = calculateMetrics(allTickets);
+                renderMetrics(metrics);
+            }
+
+            if (searchTerm === '') {
+                filteredTickets = allTickets;
+            } else {
+                filteredTickets = allTickets.filter(ticket =>
+                    ticket.issueKey.toLowerCase().includes(searchTerm) ||
+                    ticket.summary.toLowerCase().includes(searchTerm) ||
+                    ticket.assignee.toLowerCase().includes(searchTerm) ||
+                    ticket.epic.toLowerCase().includes(searchTerm) ||
+                    ticket.status.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            renderIssueTable(filteredTickets);
+        });
+
+        document.getElementById('presentationModeBtn').addEventListener('click', () => {
+            document.body.classList.toggle('presentation-mode');
+            const btn = document.getElementById('presentationModeBtn');
+            btn.textContent = document.body.classList.contains('presentation-mode')
+                ? 'Exit Presentation'
+                : 'Presentation Mode';
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            loadDefaultData();
+        });
+
+        // Dark mode toggle
+        document.getElementById('darkModeBtn').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            const btn = document.getElementById('darkModeBtn');
+            const isDark = document.body.classList.contains('dark-mode');
+            btn.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+
+            // Save preference to localStorage
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+        });
+
+        // Clear filter button
+        document.getElementById('clearFilterBtn').addEventListener('click', () => {
+            activeFilter = null;
+            filteredTickets = allTickets;
+            document.getElementById('searchBox').value = '';
+
+            updateFilterBadge();
+
+            const metrics = calculateMetrics(allTickets);
+            const dateProgress = calculateDateBasedProgress(allTickets);
+            renderMetrics(metrics, dateProgress);
+            renderIssueTable(filteredTickets);
+        });
+
+        // Dismiss demo warning banner
+        document.getElementById('dismissDemoWarning').addEventListener('click', () => {
+            hideDemoWarning();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // P = Toggle presentation mode
+            if (e.key === 'p' || e.key === 'P') {
+                if (!e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    document.getElementById('presentationModeBtn').click();
+                }
+            }
+
+            // D = Toggle dark mode
+            if (e.key === 'd' || e.key === 'D') {
+                if (!e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    document.getElementById('darkModeBtn').click();
+                }
+            }
+
+            // Escape = Clear filters
+            if (e.key === 'Escape') {
+                if (activeFilter) {
+                    document.getElementById('clearFilterBtn').click();
+                }
+            }
+        });
+
+        // File upload handlers
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const csvText = e.target.result;
+                await loadData(csvText, file.name);
+            };
+            reader.readAsText(file);
+        }
+
+        // ===== INITIALIZATION =====
+        window.addEventListener('DOMContentLoaded', () => {
+            // Load dark mode preference from localStorage
+            const darkMode = localStorage.getItem('darkMode');
+            if (darkMode === 'enabled') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeBtn').textContent = 'Light Mode';
+            }
+
+            // Render milestone data immediately (doesn't depend on CSV)
+            renderMilestoneAccordion();
+            renderRisksTable();
+
+            // Load data
+            loadDefaultData();
+        });
+    </script>
+</body>
+</html>
