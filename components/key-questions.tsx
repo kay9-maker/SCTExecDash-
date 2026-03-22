@@ -32,10 +32,10 @@ const questionCards = [
     icon: CheckCircle,
     title: 'COMPLETION',
     question: 'How much of this sprint is done?',
-    color: 'purple',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
-    iconColor: 'text-purple-600',
+    color: 'sky',
+    bgColor: 'bg-sky-50',
+    borderColor: 'border-sky-200',
+    iconColor: 'text-sky-700',
   },
   {
     icon: TrendingUp,
@@ -114,8 +114,8 @@ export function KeyQuestions({ metrics, blockedCount, agingCount }: KeyQuestions
           status: `${metrics.percentComplete}%`,
           detail: `${metrics.doneTickets} of ${metrics.totalTickets} issues still open`,
           badge: `${metrics.percentComplete}%`,
-          badgeColor: 'text-purple-700',
-          badgeBg: 'bg-purple-100',
+          badgeColor: 'text-sky-800',
+          badgeBg: 'bg-sky-100',
         }
 
       case 3: // Velocity

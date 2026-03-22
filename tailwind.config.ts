@@ -42,6 +42,12 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        jpmc: {
+          navy: 'hsl(var(--jpmc-navy))',
+          'navy-deep': 'hsl(var(--jpmc-navy-deep))',
+          blue: 'hsl(var(--jpmc-blue))',
+          'blue-light': 'hsl(var(--jpmc-blue-light))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

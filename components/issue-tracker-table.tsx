@@ -14,12 +14,12 @@ const priorityColors = {
 }
 
 const epicColors: Record<string, string> = {
-  'Authentication': 'bg-purple-100 text-purple-700',
-  'Dashboard': 'bg-blue-100 text-blue-700',
-  'API Integration': 'bg-teal-100 text-teal-700',
-  'Mobile App': 'bg-pink-100 text-pink-700',
-  'Testing': 'bg-indigo-100 text-indigo-700',
-  'Documentation': 'bg-orange-100 text-orange-700',
+  'Authentication': 'bg-sky-100 text-sky-800',
+  'Dashboard': 'bg-blue-100 text-blue-800',
+  'API Integration': 'bg-teal-100 text-teal-800',
+  'Mobile App': 'bg-slate-100 text-slate-800',
+  'Testing': 'bg-cyan-100 text-cyan-800',
+  'Documentation': 'bg-orange-100 text-orange-800',
 }
 
 export function IssueTrackerTable({ tickets }: IssueTrackerTableProps) {
@@ -33,7 +33,7 @@ export function IssueTrackerTable({ tickets }: IssueTrackerTableProps) {
           <input
             type="text"
             placeholder="Search issues..."
-            className="px-3 py-1.5 text-sm border border-slate-300 rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm border border-slate-300 rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-[#117ACA]"
           />
         </div>
       </CardHeader>
@@ -72,7 +72,7 @@ export function IssueTrackerTable({ tickets }: IssueTrackerTableProps) {
               {tickets.map((ticket) => (
                 <tr key={ticket.issueKey} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
-                    <span className="text-blue-600 font-mono font-semibold text-xs hover:underline cursor-pointer">
+                    <span className="text-[#117ACA] font-mono font-semibold text-xs hover:underline cursor-pointer">
                       {ticket.issueKey}
                     </span>
                   </td>
@@ -88,7 +88,7 @@ export function IssueTrackerTable({ tickets }: IssueTrackerTableProps) {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#004B87] to-[#117ACA] flex items-center justify-center text-white text-xs font-bold">
                         {ticket.assignee ? ticket.assignee[0].toUpperCase() : 'U'}
                       </div>
                       <span className="text-slate-700 font-medium">{ticket.assignee}</span>

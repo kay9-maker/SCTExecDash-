@@ -153,36 +153,35 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Dark Header */}
-      <header className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 text-white shadow-xl sticky top-0 z-50">
+      <header className="bg-gradient-to-r from-[#003057] via-[#004B87] to-[#117ACA] text-white shadow-xl sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-6 sm:px-8 lg:px-12 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center font-bold text-sm">
-                  LM
+                <div className="w-8 h-8 bg-white/95 text-[#004B87] rounded flex items-center justify-center font-bold text-xs tracking-tight">
+                  JPMC
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold">Lumenalta</h1>
+                  <h1 className="text-xl font-bold tracking-tight">Supply Chain Technology Dashboard</h1>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/90 mt-0.5">
+                    JPMorgan Chase
+                  </p>
                 </div>
-              </div>
-              <div className="text-indigo-200 text-sm ml-2">
-                DOMO - Capital Group
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <select className="bg-indigo-800/50 border border-indigo-700 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <select className="bg-white/15 border border-white/30 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/50">
                 <option>Sprint {sprintInfo?.sprintNumber || 14} (Current)</option>
                 <option>Sprint {(sprintInfo?.sprintNumber || 14) - 1}</option>
                 <option>Sprint {(sprintInfo?.sprintNumber || 14) - 2}</option>
               </select>
-              <select className="bg-indigo-800/50 border border-indigo-700 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <select className="bg-white/15 border border-white/30 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/50">
                 <option>All Statuses</option>
                 <option>Done</option>
                 <option>In Progress</option>
                 <option>Blocked</option>
               </select>
-              <select className="bg-indigo-800/50 border border-indigo-700 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <select className="bg-white/15 border border-white/30 text-white text-sm rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/50">
                 <option>All Priorities</option>
                 <option>High</option>
                 <option>Medium</option>
@@ -205,16 +204,16 @@ export default function DashboardPage() {
 
         {/* Sprint Progress Bar */}
         {tickets.length > 0 && (
-          <div className="max-w-[1600px] mx-auto px-6 sm:px-8 lg:px-12 pb-3 border-t border-indigo-800/50 pt-3">
+          <div className="max-w-[1600px] mx-auto px-6 sm:px-8 lg:px-12 pb-3 border-t border-white/20 pt-3">
             <div className="flex items-center justify-between text-sm mb-2">
-              <div className="text-indigo-300 font-semibold text-xs uppercase tracking-wider">
-                Sprint {sprintInfo?.sprintNumber || 14} Progress
+              <div className="text-white/90 font-semibold text-xs uppercase tracking-wider">
+                Current Sprint Progress
               </div>
-              <div className="text-indigo-300 text-xs">
+              <div className="text-white/80 text-xs">
                 {metrics.doneTickets} of {metrics.totalTickets} completed &nbsp;&nbsp; {metrics.percentComplete}%
               </div>
             </div>
-            <div className="h-2 bg-indigo-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-[#003057]/80 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500"
                 style={{ width: `${metrics.percentComplete}%` }}
@@ -311,9 +310,9 @@ export default function DashboardPage() {
             {/* Issue Tracker Table */}
             <div>
               {statusFilter !== 'all' && (
-                <div className="mb-4 flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                <div className="mb-4 flex items-center justify-between bg-sky-50 border border-sky-200 rounded-lg px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-medium text-blue-900">
+                    <div className="text-sm font-medium text-[#003057]">
                       Showing {filteredTickets.length} {
                         statusFilter === 'completed' ? 'completed' :
                         statusFilter === 'in-progress' ? 'in progress' :
@@ -325,7 +324,7 @@ export default function DashboardPage() {
                   </div>
                   <button
                     onClick={() => setStatusFilter('all')}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="text-sm font-medium text-[#117ACA] hover:text-[#004B87] hover:underline"
                   >
                     Clear filter
                   </button>

@@ -7,11 +7,11 @@ interface NarrativeSummaryProps {
 
 export function NarrativeSummary({ narrative }: NarrativeSummaryProps) {
   return (
-    <Card className="bg-gradient-to-br from-blue-50 via-indigo-50/50 to-blue-50 border-blue-200/60 shadow-md overflow-hidden">
+    <Card className="bg-gradient-to-br from-sky-50 via-slate-50/80 to-sky-50 border-sky-200/60 shadow-md overflow-hidden">
       <CardContent className="pt-8 pb-8">
         <div className="flex gap-5">
           <div className="flex-shrink-0">
-            <div className="p-3.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+            <div className="p-3.5 bg-gradient-to-br from-[#004B87] to-[#117ACA] rounded-xl shadow-lg">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
           </div>

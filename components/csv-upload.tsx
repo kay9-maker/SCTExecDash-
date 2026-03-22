@@ -30,7 +30,7 @@ export function CSVUpload({ onFileSelect, isLoading = false }: CSVUploadProps) {
     <Card className="border-2 border-dashed border-slate-300 bg-gradient-to-br from-white to-slate-50/50 hover:border-slate-400 transition-all duration-300">
       <CardContent className="pt-8">
         <div className="flex flex-col items-center justify-center space-y-6 py-12">
-          <div className="p-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
+          <div className="p-6 bg-gradient-to-br from-[#004B87] to-[#117ACA] rounded-2xl shadow-lg">
             <Upload className="h-10 w-10 text-white" />
           </div>
           <div className="text-center space-y-3">

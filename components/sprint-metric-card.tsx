@@ -32,7 +32,7 @@ export function SprintMetricCard({ label, value, subtitle, color = 'default', on
       className={cn(
         'bg-white border-slate-200 transition-all',
         onClick && 'cursor-pointer hover:shadow-lg hover:scale-105',
-        isActive && 'ring-2 ring-blue-500 shadow-lg'
+        isActive && 'ring-2 ring-[#117ACA] shadow-lg'
       )}
       onClick={onClick}
     >
