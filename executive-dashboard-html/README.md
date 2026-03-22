@@ -54,6 +54,7 @@ Your Jira CSV export should include these columns (flexible header names support
 - **Epic** (or Epic Name, Epic Link)
 - **Custom field (Epic link)** — Primary source for Epic Breakdown chart labels (Jira export)
 - **Component/s** (or Components, Component) — Used as milestones in the Milestone Tracker
+- **Sprint** — Q{quarter} S{sprint} format (e.g. Q3 S1) for Current Sprint Progress
 - **Created** (or Create Date)
 - **Updated** (or Last Updated)
 - **Due Date** (or Due)

@@ -1795,7 +1795,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
         <!-- Progress Bar -->
         <div class="progress-bar-container" id="metricsSection">
             <div class="progress-bar-label">
-                <span id="progressLabel">Sprint Progress</span>
+                <span id="progressLabel">Current Sprint Progress</span>
                 <span id="progressPercent">0%</span>
             </div>
             <div class="progress-bar">
@@ -1829,9 +1829,9 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 </div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">Critical Path Stories</div>
-                <div id="criticalPathTable" style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
-                    <!-- Critical path table will be inserted here -->
+                <div class="chart-title">Story Points by Assignee</div>
+                <div class="chart-container">
+                    <canvas id="storyPointsByAssigneeChart"></canvas>
                 </div>
             </div>
         </div>
@@ -2150,7 +2150,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                             const priority = row['Priority'] || '';
                             const parentKey = row['Parent key'] || row['Parent Key'] || '';
                             const parentSummary = row['Parent summary'] || row['Parent Summary'] || '';
-                            const epicLink = row['Custom field (Epic link)'] || row['Custom field (epic link)'] || row['Epic Link'] || '';
+                            const epicLink = row['Custom field (Epic link)'] || row['Custom field (epic link)'] || row['Custom field (Epic Link)'] || row['Epic Link'] || '';
                             const epic = epicLink || parentSummary || row['Labels_1'] || row['Epic'] || row['Epic Name'] || '';
                             const labels = row['Labels'] || '';
                             const component = row['Component/s'] || row['Components'] || row['Component'] || '';
@@ -2222,11 +2222,12 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
 
         function getEpicBreakdown(tickets) {
             const epicMap = new Map();
+            // Only include tickets with Custom field (Epic Link) - unique epics from that column
+            const ticketsWithEpic = tickets.filter(t => t.epicLink && t.epicLink.trim() !== '');
 
-            tickets.forEach(ticket => {
-                // Use Custom field (epic link) for unique epic names, fall back to epic field
-                const epicKey = ticket.epicLink || ticket.epic || 'Others';
-                const epicName = ticket.epicLink || ticket.epic || 'Others';
+            ticketsWithEpic.forEach(ticket => {
+                const epicKey = ticket.epicLink.trim();
+                const epicName = epicKey;
 
                 if (!epicMap.has(epicKey)) {
                     epicMap.set(epicKey, {
@@ -2236,6 +2237,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                         inReview: 0,
                         todo: 0,
                         blocked: 0,
+                        cancelled: 0,
                         total: 0
                     });
                 }
@@ -2249,6 +2251,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                     case 'In Review': epicData.inReview++; break;
                     case 'To Do': epicData.todo++; break;
                     case 'Blocked': epicData.blocked++; break;
+                    case 'Cancelled': epicData.cancelled++; break;
                 }
             });
 
@@ -2294,34 +2297,42 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
         function getCurrentSprintMetrics(tickets) {
             if (tickets.length === 0) return { sprintNumber: 'N/A', committed: 0, completed: 0 };
 
-            // Get sprint number from tickets
-            const sprintNumbers = tickets
+            // Get latest sprint (Q3 S1 format) and filter to those tickets
+            const sprintValues = tickets
                 .map(t => t.sprint)
+                .filter(Boolean)
+                .map(s => parseSprintValue(s))
                 .filter(Boolean);
 
+            let sprintTickets = tickets;
             let sprintNumber = 'Current Sprint';
-            if (sprintNumbers.length > 0) {
-                const sprintCounts = {};
-                sprintNumbers.forEach(s => {
-                    sprintCounts[s] = (sprintCounts[s] || 0) + 1;
+
+            if (sprintValues.length > 0) {
+                const uniqueSprints = [...new Map(sprintValues.map(s => [s.raw, s])).values()];
+                uniqueSprints.sort((a, b) => {
+                    if (a.quarter !== b.quarter) return b.quarter - a.quarter;
+                    return b.sprint - a.sprint;
                 });
-                sprintNumber = Object.keys(sprintCounts).reduce((a, b) =>
-                    sprintCounts[a] > sprintCounts[b] ? a : b
-                );
+                const latest = uniqueSprints[0];
+                sprintNumber = latest.raw;
+                sprintTickets = tickets.filter(t => {
+                    const p = parseSprintValue(t.sprint);
+                    return p && p.quarter === latest.quarter && p.sprint === latest.sprint;
+                });
             }
 
             // Calculate totals (use story points if available, otherwise ticket count)
-            const totalPoints = tickets.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
-            const completedPoints = tickets.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+            const totalPoints = sprintTickets.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+            const completedPoints = sprintTickets.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
             // Include In Progress, In Review, and In Testing in the "In Progress" bar
             const inProgressStatuses = ['In Progress', 'In Review', 'In Testing'];
-            const inProgressPoints = tickets.filter(t => inProgressStatuses.includes(t.status)).reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+            const inProgressPoints = sprintTickets.filter(t => inProgressStatuses.includes(t.status)).reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
             const useTicketCount = totalPoints === 0;
-            const committed = useTicketCount ? tickets.length : totalPoints;
-            const completed = useTicketCount ? tickets.filter(t => t.status === 'Done').length : completedPoints;
-            const inProgress = useTicketCount ? tickets.filter(t => inProgressStatuses.includes(t.status)).length : inProgressPoints;
+            const committed = useTicketCount ? sprintTickets.length : totalPoints;
+            const completed = useTicketCount ? sprintTickets.filter(t => t.status === 'Done').length : completedPoints;
+            const inProgress = useTicketCount ? sprintTickets.filter(t => inProgressStatuses.includes(t.status)).length : inProgressPoints;
             const unit = useTicketCount ? 'Tickets' : 'Story Points';
 
             return {
@@ -2571,37 +2582,53 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             return html;
         }
 
-        // ===== DATE-BASED PROGRESS CALCULATION =====
-        function calculateDateBasedProgress(tickets) {
-            const startDate = new Date('2026-01-01');
+        // Parse sprint string (Q3 S1 format) and return {quarter, sprint} or null
+        function parseSprintValue(str) {
+            if (!str || typeof str !== 'string') return null;
+            const m = str.trim().match(/Q(\d+)\s*S(\d+)/i);
+            if (!m) return null;
+            return { quarter: parseInt(m[1], 10), sprint: parseInt(m[2], 10), raw: str.trim() };
+        }
 
-            // Find the last due date from tickets
-            let endDate = new Date('2026-04-27'); // Default
-            tickets.forEach(ticket => {
-                if (ticket.dueDate) {
-                    const dueDate = new Date(ticket.dueDate);
-                    if (dueDate > endDate) {
-                        endDate = dueDate;
-                    }
-                }
+        // Get latest sprint from tickets (by quarter, then sprint) and its completion %
+        function getCurrentSprintProgress(tickets) {
+            const sprintValues = tickets
+                .map(t => t.sprint)
+                .filter(Boolean)
+                .map(s => parseSprintValue(s))
+                .filter(Boolean);
+
+            if (sprintValues.length === 0) {
+                const total = tickets.length;
+                const done = tickets.filter(t => t.status === 'Done').length;
+                return {
+                    sprintLabel: 'Current Sprint',
+                    progressPercent: total > 0 ? Math.round((done / total) * 100) : 0
+                };
+            }
+
+            const uniqueSprints = [...new Map(sprintValues.map(s => [s.raw, s])).values()];
+            uniqueSprints.sort((a, b) => {
+                if (a.quarter !== b.quarter) return b.quarter - a.quarter;
+                return b.sprint - a.sprint;
             });
+            const latest = uniqueSprints[0];
 
-            const today = new Date();
-            const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-            const elapsedDays = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
-            const progressPercent = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
+            const sprintTickets = tickets.filter(t => {
+                const p = parseSprintValue(t.sprint);
+                return p && p.quarter === latest.quarter && p.sprint === latest.sprint;
+            });
+            const total = sprintTickets.length;
+            const done = sprintTickets.filter(t => t.status === 'Done').length;
 
             return {
-                progressPercent,
-                startDate: startDate.toLocaleDateString(),
-                endDate: endDate.toLocaleDateString(),
-                elapsedDays,
-                totalDays
+                sprintLabel: latest.raw,
+                progressPercent: total > 0 ? Math.round((done / total) * 100) : 0
             };
         }
 
         // ===== UI RENDERING =====
-        function renderMetrics(metrics, dateProgress) {
+        function renderMetrics(metrics, sprintProgress) {
             const metricsGrid = document.getElementById('metricsGrid');
             metricsGrid.innerHTML = `
                 <div class="metric-card done ${activeFilter === 'all' ? 'active' : ''}" data-filter="all">
@@ -2635,14 +2662,15 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 </div>
             `;
 
-            // Update progress bar with date-based progress
-            if (dateProgress) {
-                document.getElementById('progressPercent').textContent = `${dateProgress.progressPercent}%`;
-                document.getElementById('progressFill').style.width = `${dateProgress.progressPercent}%`;
-                document.getElementById('progressLabel').textContent = `Sprint Progress (${dateProgress.startDate} - ${dateProgress.endDate})`;
+            // Update progress bar with current sprint progress
+            if (sprintProgress) {
+                document.getElementById('progressPercent').textContent = `${sprintProgress.progressPercent}%`;
+                document.getElementById('progressFill').style.width = `${sprintProgress.progressPercent}%`;
+                document.getElementById('progressLabel').textContent = `Current Sprint Progress • ${sprintProgress.sprintLabel}`;
             } else {
                 document.getElementById('progressPercent').textContent = `${metrics.percentComplete}%`;
                 document.getElementById('progressFill').style.width = `${metrics.percentComplete}%`;
+                document.getElementById('progressLabel').textContent = 'Current Sprint Progress';
             }
 
             // Add click event listeners to metric cards
@@ -2687,8 +2715,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
 
             // Re-render with updated filter
             const metrics = calculateMetrics(allTickets);
-            const dateProgress = calculateDateBasedProgress(allTickets);
-            renderMetrics(metrics, dateProgress);
+            renderMetrics(metrics, getCurrentSprintProgress(allTickets));
             renderIssueTable(filteredTickets);
         }
 
@@ -2817,6 +2844,11 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                             label: 'Blocked',
                             data: epics.map(e => e.blocked),
                             backgroundColor: '#ef4444'
+                        },
+                        {
+                            label: 'Cancelled',
+                            data: epics.map(e => e.cancelled || 0),
+                            backgroundColor: '#dc2626'
                         }
                     ]
                 },
@@ -3119,51 +3151,53 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             });
         }
 
-        function renderCriticalPathTable(tickets) {
-            const tableContainer = document.getElementById('criticalPathTable');
+        function renderStoryPointsByAssigneeChart(tickets) {
+            const ctx = document.getElementById('storyPointsByAssigneeChart');
+            if (!ctx) return;
 
-            // Filter tickets that have labels (critical path items)
-            const criticalPathItems = tickets.filter(t => t.labels && t.labels.trim() !== '');
+            if (charts.storyPointsByAssignee) {
+                charts.storyPointsByAssignee.destroy();
+            }
 
-            // Sort by due date (earliest first)
-            criticalPathItems.sort((a, b) => {
-                if (!a.dueDate) return 1;
-                if (!b.dueDate) return -1;
-                return new Date(a.dueDate) - new Date(b.dueDate);
+            const assigneeMap = new Map();
+            tickets.forEach(t => {
+                const assignee = t.assignee || 'Unassigned';
+                const pts = t.storyPoints || 0;
+                assigneeMap.set(assignee, (assigneeMap.get(assignee) || 0) + pts);
             });
 
-            if (criticalPathItems.length === 0) {
-                tableContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #6b7280;">No critical path items found</p>';
+            const assignees = Array.from(assigneeMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 12);
+
+            if (assignees.length === 0) {
                 return;
             }
 
-            // Generate table HTML
-            const tableHTML = `
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
-                    <thead>
-                        <tr>
-                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; position: sticky; top: 0;">Summary</th>
-                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; width: 120px; position: sticky; top: 0;">Status</th>
-                            <th style="background: #f9fafb; padding: 0.75rem; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; width: 120px; position: sticky; top: 0;">Due Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${criticalPathItems.map(item => {
-                            const statusClass = item.status.toLowerCase().replace(/ /g, '-');
-                            const dueDate = item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Not set';
-                            return `
-                                <tr style="border-bottom: 1px solid #e5e7eb;">
-                                    <td style="padding: 0.75rem;">${item.summary}</td>
-                                    <td style="padding: 0.75rem;"><span class="status-badge status-${statusClass}">${item.status}</span></td>
-                                    <td style="padding: 0.75rem;">${dueDate}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-
-            tableContainer.innerHTML = tableHTML;
+            const colors = ['#117ACA', '#4DA3E0', '#10b981', '#f59e0b', '#6b7280', '#ef4444', '#8b5cf6', '#ec4899'];
+            charts.storyPointsByAssignee = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: assignees.map(a => a[0]),
+                    datasets: [{
+                        label: 'Story Points',
+                        data: assignees.map(a => a[1]),
+                        backgroundColor: assignees.map((_, i) => colors[i % colors.length])
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: { ticks: { font: { size: 11 } } }
+                    }
+                }
+            });
         }
 
         // ===== MILESTONE TRACKER (derived from CSV Component/s column) =====
@@ -3500,18 +3534,17 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 }
 
                 const metrics = calculateMetrics(allTickets);
-                const dateProgress = calculateDateBasedProgress(allTickets);
+                const sprintProgress = getCurrentSprintProgress(allTickets);
                 const epicBreakdown = getEpicBreakdown(allTickets);
-                const sprintProgress = getSprintProgress(allTickets);
                 const sprintMetrics = getCurrentSprintMetrics(allTickets);
                 milestonesData = getMilestonesFromTickets(allTickets);
 
                 renderExecutiveSummary(milestonesData, allTickets, risksData);
-                renderMetrics(metrics, dateProgress);
+                renderMetrics(metrics, sprintProgress);
                 renderStatusDonutChart(metrics);
                 renderEpicBreakdownChart(epicBreakdown);
                 renderCurrentSprintChart(sprintMetrics);
-                renderCriticalPathTable(allTickets);
+                renderStoryPointsByAssigneeChart(allTickets);
                 renderMilestoneTracker();
                 renderRisksTable();
                 renderIssueTable(allTickets);
@@ -3549,7 +3582,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             if (searchTerm !== '') {
                 activeFilter = null;
                 const metrics = calculateMetrics(allTickets);
-                renderMetrics(metrics);
+                renderMetrics(metrics, getCurrentSprintProgress(allTickets));
             }
 
             if (searchTerm === '') {
@@ -3599,8 +3632,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             updateFilterBadge();
 
             const metrics = calculateMetrics(allTickets);
-            const dateProgress = calculateDateBasedProgress(allTickets);
-            renderMetrics(metrics, dateProgress);
+            renderMetrics(metrics, getCurrentSprintProgress(allTickets));
             renderIssueTable(filteredTickets);
         });
 
