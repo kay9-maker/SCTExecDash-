@@ -1127,6 +1127,12 @@
             background: #f59e0b;
         }
 
+        .cancelled-col,
+        .cancelled-cell {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
         .win-item {
             display: flex;
             align-items: flex-start;
@@ -1886,53 +1892,8 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
         let activeFilter = null; // Track active filter: 'done', 'in-progress', 'in-review', 'todo', 'blocked', or null
         let isUsingDemoData = false; // Track if we're viewing demo/sample data
 
-        // ===== MILESTONE DATA WITH DELIVERABLES =====
-        // Progress is auto-calculated from deliverable statuses
-        const milestonesData = [
-            {
-                id: 'M1',
-                dueDate: 'October 31, 2025',
-                originalDate: null,
-                theme: 'Enhance CORE DOMO + Elysium Architecture',
-                deliverables: [
-                    { id: 'm1-1', name: '1.1 Enabling Disaster Recovery (DR) for DOMO', status: 'Complete', progress: 100 },
-                    { id: 'm1-2', name: '1.2 Implementing DOMO Prod Parallel for testing', status: 'Complete', progress: 100 },
-                    { id: 'm1-3', name: '1.3 Design Elysium', status: 'Complete', progress: 100 }
-                ]
-            },
-            {
-                id: 'M2',
-                dueDate: '01/30/26',
-                originalDate: 'November 30, 2025',
-                theme: 'Operational Data Store (Elysium) Design + Predictive Monitoring UI Design',
-                deliverables: [
-                    { id: 'm2-1', name: '2.1 Elysium Design', status: 'In Progress', progress: 95 },
-                    { id: 'm2-2', name: '2.2 Predict Critical Batch Design Completion/Approval', status: 'Complete', progress: 100 }
-                ]
-            },
-            {
-                id: 'M3',
-                dueDate: '02/28/26',
-                originalDate: 'December 31, 2025',
-                theme: 'Elysium Development Complete',
-                deliverables: [
-                    { id: 'm3-1', name: '3.1 Implement Elysium DEV', status: 'In Progress', progress: 55 },
-                    { id: 'm3-2', name: '3.2 Predict Critical Batch Completion', status: 'Complete', progress: 100 }
-                ]
-            },
-            {
-                id: 'M4',
-                dueDate: '03/31/2026',
-                originalDate: 'January 16, 2026',
-                theme: 'Elysium + Predictive Monitoring Production Deployed',
-                deliverables: [
-                    { id: 'm4-1', name: '4.1 Implement Elysium PROD', status: 'Not Started', progress: 0 },
-                    { id: 'm4-2', name: '4.2 Databricks AI BI Pilot', status: 'In Progress', progress: 25 },
-                    { id: 'm4-3', name: '4.3 Domo Dashboard Usage Statistics POC', status: 'Not Started', progress: 0 },
-                    { id: 'm4-4', name: '4.4 Astronomer Impact Analysis', status: 'In Progress', progress: 25 }
-                ]
-            }
-        ];
+        // ===== MILESTONE DATA (derived from CSV Component/s column) =====
+        let milestonesData = [];
 
         // ===== RISKS & BLOCKERS DATA =====
         // TO UPDATE: Edit this data structure with your Confluence risks information
@@ -1958,19 +1919,6 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
         ];
 
         // ===== LOCAL STORAGE PERSISTENCE =====
-        function loadMilestoneDataFromStorage() {
-            const stored = localStorage.getItem('milestoneData');
-            if (stored) {
-                try {
-                    return JSON.parse(stored);
-                } catch (e) {
-                    console.error('Error parsing stored milestone data:', e);
-                    return null;
-                }
-            }
-            return null;
-        }
-
         function loadRisksDataFromStorage() {
             const stored = localStorage.getItem('risksData');
             if (stored) {
@@ -1984,23 +1932,13 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             return null;
         }
 
-        function saveMilestoneDataToStorage(data) {
-            localStorage.setItem('milestoneData', JSON.stringify(data));
-        }
-
         function saveRisksDataToStorage(data) {
             localStorage.setItem('risksData', JSON.stringify(data));
         }
 
         // Load data from storage on page load
-        const storedMilestones = loadMilestoneDataFromStorage();
         const storedRisks = loadRisksDataFromStorage();
 
-        // Override defaults if stored data exists
-        if (storedMilestones) {
-            milestonesData.length = 0;
-            milestonesData.push(...storedMilestones);
-        }
         if (storedRisks) {
             risksData.length = 0;
             risksData.push(...storedRisks);
@@ -2183,7 +2121,12 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             'on hold': 'Blocked',
             'waiting': 'Blocked',
             'paused': 'Blocked',
-            'impediment': 'Blocked'
+            'impediment': 'Blocked',
+            'cancelled': 'Cancelled',
+            'canceled': 'Cancelled',
+            "won't do": 'Cancelled',
+            'wont do': 'Cancelled',
+            'won\'t fix': 'Cancelled'
         };
 
         function normalizeStatus(status) {
@@ -2207,8 +2150,10 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                             const priority = row['Priority'] || '';
                             const parentKey = row['Parent key'] || row['Parent Key'] || '';
                             const parentSummary = row['Parent summary'] || row['Parent Summary'] || '';
-                            const epic = parentSummary || row['Labels_1'] || row['Epic'] || row['Epic Name'] || row['Epic Link'] || '';
+                            const epicLink = row['Custom field (Epic link)'] || row['Custom field (epic link)'] || row['Epic Link'] || '';
+                            const epic = epicLink || parentSummary || row['Labels_1'] || row['Epic'] || row['Epic Name'] || '';
                             const labels = row['Labels'] || '';
+                            const component = row['Component/s'] || row['Components'] || row['Component'] || '';
                             const sprint = row['Sprint'] || '';
                             const created = row['Created'] || row['Create Date'] || '';
                             const updated = row['Updated'] || row['Last Updated'] || '';
@@ -2224,8 +2169,10 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                                 priority,
                                 parentKey,
                                 parentSummary,
-                                epic,
+                                epic: epic || 'Others',
+                                epicLink: epicLink || '',
                                 labels,
+                                component,
                                 sprint,
                                 created,
                                 updated,
@@ -2277,9 +2224,9 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             const epicMap = new Map();
 
             tickets.forEach(ticket => {
-                // Use parentKey for grouping (unique identifier) or parentSummary, or fall back to epic field
-                const epicKey = ticket.parentKey || ticket.parentSummary || ticket.epic || 'Others';
-                const epicName = ticket.parentSummary || ticket.epic || 'Others';
+                // Use Custom field (epic link) for unique epic names, fall back to epic field
+                const epicKey = ticket.epicLink || ticket.epic || 'Others';
+                const epicName = ticket.epicLink || ticket.epic || 'Others';
 
                 if (!epicMap.has(epicKey)) {
                     epicMap.set(epicKey, {
@@ -2386,6 +2333,47 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             };
         }
 
+        // Derive milestones from CSV Component/s column
+        function getMilestonesFromTickets(tickets) {
+            const componentMap = new Map();
+            const parseComponents = (val) => {
+                if (!val || typeof val !== 'string') return ['No Component'];
+                const parts = val.split(/[;,]/).map(c => c.trim()).filter(Boolean);
+                return parts.length > 0 ? parts : ['No Component'];
+            };
+
+            tickets.forEach(ticket => {
+                const components = parseComponents(ticket.component);
+                components.forEach(comp => {
+                    const name = comp || 'No Component';
+                    if (!componentMap.has(name)) {
+                        componentMap.set(name, { total: 0, done: 0, cancelled: 0, inProgress: 0, inReview: 0, todo: 0, blocked: 0 });
+                    }
+                    const m = componentMap.get(name);
+                    m.total++;
+                    switch (ticket.status) {
+                        case 'Done': m.done++; break;
+                        case 'Cancelled': m.cancelled++; break;
+                        case 'In Progress': m.inProgress++; break;
+                        case 'In Review': m.inReview++; break;
+                        case 'To Do': m.todo++; break;
+                        case 'Blocked': m.blocked++; break;
+                    }
+                });
+            });
+
+            return Array.from(componentMap.entries())
+                .map(([id, m]) => ({
+                    id,
+                    theme: id,
+                    total: m.total,
+                    done: m.done,
+                    cancelled: m.cancelled,
+                    progress: m.total > 0 ? Math.round((m.done / m.total) * 100) : 0
+                }))
+                .sort((a, b) => b.total - a.total);
+        }
+
         // ===== NEW EXECUTIVE SUMMARY FUNCTIONS =====
 
         // Helper: Get recent completions from tickets
@@ -2424,7 +2412,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
 
             // Show each milestone progress
             milestonesData.forEach(milestone => {
-                const progress = calculateMilestoneProgress(milestone.deliverables);
+                const progress = milestone.progress ?? 0;
                 const progressClass = progress >= 70 ? 'high' : progress >= 50 ? 'medium' : 'low';
 
                 html += `
@@ -2440,7 +2428,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             });
 
             // Calculate overall program health
-            const totalProgress = milestonesData.reduce((sum, m) => sum + calculateMilestoneProgress(m.deliverables), 0);
+            const totalProgress = milestonesData.reduce((sum, m) => sum + (m.progress ?? 0), 0);
             const overallProgress = Math.round(totalProgress / milestonesData.length);
             const healthStatus = overallProgress >= 70 ? 'On Track' : overallProgress >= 50 ? 'In Progress' : 'Needs Attention';
 
@@ -2459,8 +2447,8 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             let html = '';
             let winsCount = 0;
 
-            // 1. Completed Milestones
-            const completedMilestones = milestonesData.filter(m => calculateMilestoneProgress(m.deliverables) === 100);
+            // 1. Completed Milestones (100% completion from CSV components)
+            const completedMilestones = milestonesData.filter(m => (m.progress ?? 0) === 100);
             if (completedMilestones.length > 0) {
                 completedMilestones.forEach(milestone => {
                     html += `
@@ -2485,7 +2473,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                         <div class="win-item">
                             <div class="win-icon">🎯</div>
                             <div class="win-content">
-                                <div class="win-title">${ticket.key}: ${ticket.summary}</div>
+                                <div class="win-title">${ticket.issueKey}: ${ticket.summary}</div>
                                 <div class="win-subtitle">${ticket.assignee || 'Unassigned'}</div>
                             </div>
                         </div>
@@ -2549,7 +2537,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 });
             }
 
-            // 2. At-Risk Milestones (schedule slipped)
+            // 2. At-Risk Milestones (schedule slipped) - not applicable for CSV-derived components
             const atRiskMilestones = milestonesData.filter(m => m.originalDate && m.originalDate !== m.dueDate);
             if (atRiskMilestones.length > 0) {
                 const topAtRisk = atRiskMilestones.slice(0, 2); // Show top 2
@@ -3178,330 +3166,50 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
             tableContainer.innerHTML = tableHTML;
         }
 
-        // ===== MILESTONE ACCORDION RENDER FUNCTION =====
-        function calculateMilestoneProgress(deliverables) {
-            if (!deliverables || deliverables.length === 0) return 0;
-            const totalProgress = deliverables.reduce((sum, d) => sum + d.progress, 0);
-            return Math.round(totalProgress / deliverables.length);
-        }
-
-        function renderMilestoneAccordion() {
+        // ===== MILESTONE TRACKER (derived from CSV Component/s column) =====
+        function renderMilestoneTracker() {
             const accordionContainer = document.getElementById('milestoneAccordion');
 
             if (milestonesData.length === 0) {
-                accordionContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #6b7280;">No milestone data available</p>';
+                accordionContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #6b7280;">No milestone data available. Load a CSV with a "Component/s" column.</p>';
                 return;
             }
 
-            // Generate table with expandable rows
-            let tableHTML = `
+            const tableHTML = `
                 <table class="milestone-table">
                     <thead>
                         <tr>
-                            <th style="width: 80px;">Milestone</th>
-                            <th style="width: 200px;">Period</th>
-                            <th>Theme</th>
-                            <th style="width: 200px;">Progress Update</th>
-                            <th style="width: 150px;">Schedule Status</th>
+                            <th style="width: 200px;">Milestone (Component)</th>
+                            <th style="width: 80px;">Total</th>
+                            <th style="width: 80px;">Done</th>
+                            <th style="width: 90px;" class="cancelled-col">Cancelled</th>
+                            <th>Completion %</th>
                         </tr>
                     </thead>
                     <tbody>
-            `;
-
-            milestonesData.forEach((milestone, index) => {
-                const progress = calculateMilestoneProgress(milestone.deliverables);
-                const progressClass = progress >= 70 ? 'high' : progress >= 50 ? 'medium' : 'low';
-
-                // Determine schedule status and class
-                let scheduleStatus = '';
-                let scheduleClass = 'schedule-on-track';
-
-                if (progress === 100) {
-                    scheduleStatus = 'Completed';
-                    scheduleClass = 'schedule-completed';
-                } else if (milestone.originalDate && milestone.originalDate !== milestone.dueDate) {
-                    scheduleStatus = 'Late';
-                    scheduleClass = 'schedule-late';
-                } else {
-                    scheduleStatus = `In Progress - ${progress}%`;
-                    scheduleClass = 'schedule-on-track';
-                }
-
-                // Table row (clickable)
-                tableHTML += `
-                    <tr class="milestone-row" onclick="toggleMilestoneAccordion('${milestone.id}')" style="cursor: pointer;">
-                        <td><span class="milestone-id">${milestone.id}</span></td>
-                        <td>
-                            ${milestone.originalDate ? `<span class="period-strikethrough">${milestone.originalDate}</span><br>` : ''}
-                            <span class="period-text">${milestone.dueDate}</span>
-                        </td>
-                        <td>${milestone.theme}</td>
-                        <td>
-                            <div>${progress}%</div>
-                            <div class="progress-bar-container-milestone">
-                                <div class="progress-bar-fill-milestone ${progressClass}" style="width: ${progress}%">
-                                    ${progress}%
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="schedule-badge ${scheduleClass}">${scheduleStatus}</span>
-                        </td>
-                    </tr>
-                `;
-
-                // Expandable form row (hidden by default)
-                tableHTML += `
-                    <tr class="milestone-accordion-content-row" id="accordion-row-${milestone.id}" style="display: none;">
-                        <td colspan="5" style="padding: 0; background: #f9fafb;">
-                            <div class="milestone-accordion-content-wrapper" style="padding: 1.5rem;">
-                                <form class="milestone-form" id="form-${milestone.id}">
-                                    <!-- Dates Section -->
-                                    <div class="milestone-form-row">
-                                        <div class="milestone-form-group">
-                                            <label>Original Due Date</label>
-                                            <input type="text" class="milestone-input" name="originalDate"
-                                                   value="${milestone.originalDate || ''}"
-                                                   placeholder="e.g., November 30, 2025">
+                        ${milestonesData.map(m => {
+                            const progress = m.progress ?? 0;
+                            const progressClass = progress >= 70 ? 'high' : progress >= 50 ? 'medium' : 'low';
+                            const safeId = String(m.id).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                            return `
+                                <tr class="milestone-row">
+                                    <td><span class="milestone-id">${safeId}</span></td>
+                                    <td>${m.total}</td>
+                                    <td>${m.done}</td>
+                                    <td class="cancelled-cell">${m.cancelled}</td>
+                                    <td>
+                                        <div class="progress-bar-container-milestone">
+                                            <div class="progress-bar-fill-milestone ${progressClass}" style="width: ${progress}%">${progress}%</div>
                                         </div>
-                                        <div class="milestone-form-group">
-                                            <label>Target Due Date <span style="color: #ef4444;">*</span></label>
-                                            <input type="text" class="milestone-input" name="dueDate"
-                                                   value="${milestone.dueDate}"
-                                                   placeholder="e.g., 01/30/26" required>
-                                        </div>
-                                    </div>
-
-                                    <!-- Theme Section -->
-                                    <div class="milestone-form-group">
-                                        <label>Milestone Theme <span style="color: #ef4444;">*</span></label>
-                                        <textarea class="milestone-textarea" name="theme" rows="2" required>${milestone.theme}</textarea>
-                                    </div>
-
-                                    <!-- Deliverables Section -->
-                                    <div class="deliverables-section">
-                                        <h4 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Deliverables</h4>
-                                        <div id="deliverables-${milestone.id}">
-                                            ${milestone.deliverables.map((deliverable, dIndex) => `
-                                                <div class="deliverable-item" data-deliverable-id="${deliverable.id}">
-                                                    <div class="deliverable-header">
-                                                        <span class="deliverable-number">#${dIndex + 1}</span>
-                                                        <button type="button" class="remove-deliverable-btn"
-                                                                onclick="event.stopPropagation(); removeDeliverable('${milestone.id}', '${deliverable.id}')">
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                    <div class="milestone-form-group">
-                                                        <label>Deliverable Name</label>
-                                                        <input type="text" class="milestone-input"
-                                                               name="deliverable-name-${deliverable.id}"
-                                                               value="${deliverable.name}" required>
-                                                    </div>
-                                                    <div class="milestone-form-row">
-                                                        <div class="milestone-form-group">
-                                                            <label>Status</label>
-                                                            <select class="milestone-select" name="deliverable-status-${deliverable.id}"
-                                                                    onchange="updateDeliverableProgress('${milestone.id}', '${deliverable.id}', this.value)">
-                                                                <option value="Not Started" ${deliverable.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
-                                                                <option value="In Progress" ${deliverable.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                                                                <option value="Complete" ${deliverable.status === 'Complete' ? 'selected' : ''}>Complete</option>
-                                                            </select>
-                                                        </div>
-                                                        <div class="milestone-form-group">
-                                                            <label>Progress %</label>
-                                                            <input type="number" class="milestone-input"
-                                                                   name="deliverable-progress-${deliverable.id}"
-                                                                   id="progress-${deliverable.id}"
-                                                                   value="${deliverable.progress}"
-                                                                   min="0" max="100"
-                                                                   ${deliverable.status !== 'In Progress' ? 'readonly' : ''}>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                        <button type="button" class="add-deliverable-btn"
-                                                onclick="event.stopPropagation(); addDeliverable('${milestone.id}')">
-                                            + Add Deliverable
-                                        </button>
-                                    </div>
-
-                                    <!-- Save Button -->
-                                    <div style="margin-top: 1.5rem; text-align: right;">
-                                        <button type="submit" class="save-milestone-btn">Save Changes</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tableHTML += `
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
 
             accordionContainer.innerHTML = tableHTML;
-
-            // Attach form submit handlers
-            milestonesData.forEach(milestone => {
-                const form = document.getElementById(`form-${milestone.id}`);
-                if (form) {
-                    form.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        saveMilestoneChanges(milestone.id);
-                    });
-                }
-            });
-        }
-
-        // ===== MILESTONE ACCORDION HELPER FUNCTIONS =====
-        function toggleMilestoneAccordion(milestoneId) {
-            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
-            if (accordionRow) {
-                // Toggle visibility
-                if (accordionRow.style.display === 'none' || accordionRow.style.display === '') {
-                    accordionRow.style.display = 'table-row';
-                } else {
-                    accordionRow.style.display = 'none';
-                }
-            }
-        }
-
-        function updateDeliverableProgress(milestoneId, deliverableId, status) {
-            const progressInput = document.getElementById(`progress-${deliverableId}`);
-            if (!progressInput) return;
-
-            // Auto-set progress based on status
-            if (status === 'Not Started') {
-                progressInput.value = 0;
-                progressInput.readOnly = true;
-            } else if (status === 'Complete') {
-                progressInput.value = 100;
-                progressInput.readOnly = true;
-            } else if (status === 'In Progress') {
-                progressInput.readOnly = false;
-                // Keep current value or default to 50 if it's 0 or 100
-                if (progressInput.value == 0 || progressInput.value == 100) {
-                    progressInput.value = 50;
-                }
-            }
-        }
-
-        function addDeliverable(milestoneId) {
-            const milestone = milestonesData.find(m => m.id === milestoneId);
-            if (!milestone) return;
-
-            // Generate new deliverable ID
-            const newId = `${milestoneId.toLowerCase()}-${Date.now()}`;
-            const newDeliverable = {
-                id: newId,
-                name: '',
-                status: 'Not Started',
-                progress: 0
-            };
-
-            milestone.deliverables.push(newDeliverable);
-
-            // Re-render the table to show the new deliverable
-            renderMilestoneAccordion();
-
-            // Keep the accordion row open
-            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
-            if (accordionRow) {
-                accordionRow.style.display = 'table-row';
-            }
-
-            // Focus on the new deliverable's name input
-            setTimeout(() => {
-                const newInput = document.querySelector(`input[name="deliverable-name-${newId}"]`);
-                if (newInput) {
-                    newInput.focus();
-                    newInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }, 100);
-        }
-
-        function removeDeliverable(milestoneId, deliverableId) {
-            const milestone = milestonesData.find(m => m.id === milestoneId);
-            if (!milestone) return;
-
-            // Don't allow removing the last deliverable
-            if (milestone.deliverables.length <= 1) {
-                alert('Each milestone must have at least one deliverable.');
-                return;
-            }
-
-            // Confirm deletion
-            if (!confirm('Are you sure you want to remove this deliverable?')) {
-                return;
-            }
-
-            // Remove deliverable from array
-            milestone.deliverables = milestone.deliverables.filter(d => d.id !== deliverableId);
-
-            // Re-render the table
-            renderMilestoneAccordion();
-
-            // Keep accordion row open
-            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
-            if (accordionRow) {
-                accordionRow.style.display = 'table-row';
-            }
-        }
-
-        function saveMilestoneChanges(milestoneId) {
-            const milestone = milestonesData.find(m => m.id === milestoneId);
-            if (!milestone) return;
-
-            const form = document.getElementById(`form-${milestoneId}`);
-            if (!form) return;
-
-            // Get form data
-            const formData = new FormData(form);
-
-            // Update milestone basic info
-            milestone.originalDate = formData.get('originalDate') || null;
-            milestone.dueDate = formData.get('dueDate');
-            milestone.theme = formData.get('theme');
-
-            // Update deliverables
-            milestone.deliverables.forEach(deliverable => {
-                const name = formData.get(`deliverable-name-${deliverable.id}`);
-                const status = formData.get(`deliverable-status-${deliverable.id}`);
-                const progress = parseInt(formData.get(`deliverable-progress-${deliverable.id}`)) || 0;
-
-                deliverable.name = name;
-                deliverable.status = status;
-                deliverable.progress = progress;
-            });
-
-            // Save to localStorage
-            saveMilestoneDataToStorage(milestonesData);
-
-            // Re-render the table to update the progress bar
-            renderMilestoneAccordion();
-
-            // Keep the accordion row open
-            const accordionRow = document.getElementById(`accordion-row-${milestoneId}`);
-            if (accordionRow) {
-                accordionRow.style.display = 'table-row';
-            }
-
-            // Show success message in the re-rendered form
-            setTimeout(() => {
-                const saveBtn = document.querySelector(`#form-${milestoneId} .save-milestone-btn`);
-                if (saveBtn) {
-                    const originalText = saveBtn.textContent;
-                    saveBtn.textContent = '✓ Saved!';
-                    saveBtn.style.background = '#10b981';
-                    setTimeout(() => {
-                        saveBtn.textContent = originalText;
-                        saveBtn.style.background = '';
-                    }, 2000);
-                }
-            }, 100);
         }
 
         function renderRisksTable() {
@@ -3796,6 +3504,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 const epicBreakdown = getEpicBreakdown(allTickets);
                 const sprintProgress = getSprintProgress(allTickets);
                 const sprintMetrics = getCurrentSprintMetrics(allTickets);
+                milestonesData = getMilestonesFromTickets(allTickets);
 
                 renderExecutiveSummary(milestonesData, allTickets, risksData);
                 renderMetrics(metrics, dateProgress);
@@ -3803,7 +3512,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 renderEpicBreakdownChart(epicBreakdown);
                 renderCurrentSprintChart(sprintMetrics);
                 renderCriticalPathTable(allTickets);
-                renderMilestoneAccordion();
+                renderMilestoneTracker();
                 renderRisksTable();
                 renderIssueTable(allTickets);
 
@@ -3977,8 +3686,7 @@ Open	Risk	Description	1	Owner Name	Status details"></textarea>
                 document.getElementById('darkModeBtn').textContent = 'Light Mode';
             }
 
-            // Render milestone data immediately (doesn't depend on CSV)
-            renderMilestoneAccordion();
+            renderMilestoneTracker();
             renderRisksTable();
 
             // Load data

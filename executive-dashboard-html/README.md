@@ -52,6 +52,8 @@ Your Jira CSV export should include these columns (flexible header names support
 - **Assignee** (or Assigned To)
 - **Priority**
 - **Epic** (or Epic Name, Epic Link)
+- **Custom field (Epic link)** — Primary source for Epic Breakdown chart labels (Jira export)
+- **Component/s** (or Components, Component) — Used as milestones in the Milestone Tracker
 - **Created** (or Create Date)
 - **Updated** (or Last Updated)
 - **Due Date** (or Due)
@@ -66,6 +68,7 @@ The dashboard automatically normalizes various Jira status names into 5 categori
 - **In Review**: In Review, In Testing, QA, Testing, Code Review, Review
 - **To Do**: To Do, TODO, Backlog, Open, New, Ready
 - **Blocked**: Blocked, On Hold, Waiting, Paused, Impediment
+- **Cancelled**: Cancelled, Canceled, Won't Do, Won't Fix (shown in red in Milestone Tracker)
 
 ### Search and Filter
 
